@@ -2,21 +2,32 @@
 #set -x
 
 # tested with FreeBSD 10.3
-
 LEROOT="/usr/local/etc/letsencrypt"
 OPENSSL="/usr/bin/openssl"
+X509OPTS="x509 -dates -email -issuer -subject -serial -noout -in"
 [ -f ~/.le-utils ] && . ~/.le-utils
 
 
-USAGE="$(basename "$0") [-h|--help] [-s|--silent] [-l|--list] [-e|--expire]
+USAGE="$(basename "$0") [-h|--help] [-l|--list] [-e|--expire] [-d|--days=NoOfDays] [-r|--raw] [-s|--silent]
           [-a|--all|<domain>] -- Letsencrypt certificates management
 where:
     -h --help             show this help
-    -s --silent           report errors only
-    -l --list             list certificates
-    -e --expire           check expiration of a certificates
-    -a --all              check all certificates
-    <domain>              check certificate"
+    -l --list             list domains
+    -e --expire           show number of days till certificate expires
+    -d --days=NoOfDays    with -e list certificates that will expire in period of NoOfDays
+    -r --raw              show raw openssl output
+    -s --silent           with -e only report number of days to expire
+    -a --all              check all domains
+    <domain>              check domain
+
+Examples:
+List all certificates that will expire in less then 30 days
+# lectl -e=30 -a
+List raw output of openssl x509 command for example.com
+# letctl -r example.com
+Output only nuber of days till certificate of example.com expires
+# letctl -s -e example.com"
+
 
 EXPECTED_ARGS=1
 if [ $# -lt $EXPECTED_ARGS ]; then
@@ -25,46 +36,74 @@ if [ $# -lt $EXPECTED_ARGS ]; then
 fi
 
 
-function le-cert-info {
-    if  LOG=$($OPENSSL x509 -enddate -noout -in $LEROOT/live/$CERT/fullchain.pem 2>&1); then
-	NOTAFTER=$(echo $LOG | cut -d= -f 2)
-	BSDDATE=$(LC_ALL=C date -j -f "%b %d %T %Y %Z" "$NOTAFTER")
-	BSDSEC=$(LC_ALL=C date -j -f "%b %d %T %Y %Z" "$NOTAFTER" "+%s")
+function bsd-date {
+	BSDDATE=$(LC_ALL=C date -j -f "%b %d %T %Y %Z" "$DATE")
+	BSDSEC=$(LC_ALL=C date -j -f "%b %d %T %Y %Z" "$DATE" "+%s")
 	EXPSEC=$(($BSDSEC - $(LC_ALL=C date +%s)))
 	EXPDAYS=$(($EXPSEC / 86400))
-	printf "$EXPDAYS [$NOTAFTER] $CERT \n"
+	}
+
+function le-cert-info {
+    if  LOG=$(LC_ALL=C $OPENSSL $X509OPTS $LEROOT/live/$DOMAIN/fullchain.pem 2>&1); then
+	if [[ $RAW = 1 ]]; then
+	    printf "$LOG\n"
+	else
+	    NOTBEFORE=$(printf "${LOG}" | grep notBefore= | cut -d= -f 2)
+	    NOTAFTER=$(printf "${LOG}" | grep notAfter= | cut -d= -f 2)
+	    ISSUER=$(printf %s "${LOG}" | grep issuer= | cut -d= -f 2-99)
+	    SUBJECT=$(printf "${LOG}" | grep subject= | cut -d= -f 2-99)
+	    SERIAL=$(printf "${LOG}" | grep serial= | cut -d= -f 2)
+	    if [[ $EXPIRE = 1 ]]; then
+		DATE=$NOTAFTER; bsd-date
+		[ $EXPDAYS -lt $DAYS ] && printf "$EXPDAYS"
+		[ $EXPDAYS -lt $DAYS ] &&(($VERBOSE)) && printf " days to the expiration of $DOMAIN\n"
+	    else
+		printf "[$NOTBEFORE] [$NOTAFTER] [$ISSUER] [$SUBJECT]\n"
+	    fi
+	fi
     else
 	printf "[ERR]: $LOG"
     fi
-}
-
+    }
 
 VERBOSE=1
-CERTS=$(cd $LEROOT/live; ls -1)
+EXPIRE=0
+RAW=0
+DAYS=999999
+DOMAINS=$(cd $LEROOT/live; ls -1)
 for i in "$@"; do
     case $i in
         -h|--help)
             echo "$USAGE"
             exit
             ;;
+	-e|--expire)
+	    EXPIRE=1
+	    ;;
+	-d=*|--days=*)
+	    DAYS="${i#*=}"
+	    ;;
         -l|--list)
-            printf "$CERTS\n"
+            printf "$DOMAINS\n"
             exit
+            ;;
+        -r|--raw)
+            RAW=1
             ;;
         -s|--silent)
             VERBOSE=0
             ;;
         -a|--all)
-            for CERT in $CERTS; do
+            for DOMAIN in $DOMAINS; do
                 le-cert-info
             done
             ;;
         *)
-            if [[ $CERTS =~ $i ]] ; then
-                CERT=$i
+            if [[ $DOMAINS =~ $i ]] ; then
+                DOMAIN=$i
                 le-cert-info
             else
-                printf "[ERR] lectl: Unknown certificate $i\n"
+                printf "[ERR] lectl: Unknown domain $i\n"
             fi
             ;;
     esac
