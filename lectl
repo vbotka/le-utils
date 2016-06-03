@@ -1,0 +1,77 @@
+#!/usr/local/bin/bash
+#set -x
+
+# tested with FreeBSD 10.3
+
+LEROOT="/usr/local/etc/letsencrypt"
+OPENSSL="/usr/bin/openssl"
+[ -f ~/.le-utils ] && . ~/.le-utils
+
+
+USAGE="$(basename "$0") [-h|--help] [-s|--silent] [-l|--list] [-e|--expire]
+          [-a|--all|<domain>] -- Letsencrypt certificates management
+where:
+    -h --help             show this help
+    -s --silent           report errors only
+    -l --list             list certificates
+    -e --expire           check expiration of a certificates
+    -a --all              check all certificates
+    <domain>              check certificate"
+
+EXPECTED_ARGS=1
+if [ $# -lt $EXPECTED_ARGS ]; then
+    echo "$USAGE"
+    exit
+fi
+
+
+function le-cert-info {
+    if  LOG=$($OPENSSL x509 -enddate -noout -in $LEROOT/live/$CERT/fullchain.pem 2>&1); then
+	NOTAFTER=$(echo $LOG | cut -d= -f 2)
+	BSDDATE=$(LC_ALL=C date -j -f "%b %d %T %Y %Z" "$NOTAFTER")
+	BSDSEC=$(LC_ALL=C date -j -f "%b %d %T %Y %Z" "$NOTAFTER" "+%s")
+	EXPSEC=$(($BSDSEC - $(LC_ALL=C date +%s)))
+	EXPDAYS=$(($EXPSEC / 86400))
+	printf "$EXPDAYS [$NOTAFTER] $CERT \n"
+    else
+	printf "[ERR]: $LOG"
+    fi
+}
+
+
+VERBOSE=1
+CERTS=$(cd $LEROOT/live; ls -1)
+for i in "$@"; do
+    case $i in
+        -h|--help)
+            echo "$USAGE"
+            exit
+            ;;
+        -l|--list)
+            printf "$CERTS\n"
+            exit
+            ;;
+        -s|--silent)
+            VERBOSE=0
+            ;;
+        -a|--all)
+            for CERT in $CERTS; do
+                le-cert-info
+            done
+            ;;
+        *)
+            if [[ $CERTS =~ $i ]] ; then
+                CERT=$i
+                le-cert-info
+            else
+                printf "[ERR] lectl: Unknown certificate $i\n"
+            fi
+            ;;
+    esac
+done
+
+exit
+
+#/usr/local/etc/rc.d/apache24 stop
+#/usr/local/bin/letsencrypt renew --dry-run --quiet
+#/usr/local/etc/rc.d/apache24 start
