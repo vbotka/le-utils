@@ -10,7 +10,7 @@ X509OPTS="x509 -dates -email -issuer -subject -serial -noout -in"
 
 USAGE="$(basename "$0") [-h|--help] [-l|--list] [-e|--expire] [-d|--days=NoOfDays] [-r|--raw] [-s|--silent]
           [-a|--all|<domain>] -- Letsencrypt certificates management
-where:
+Where:
     -h --help             show this help
     -l --list             list domains
     -e --expire           show number of days till certificate expires
@@ -23,10 +23,12 @@ where:
 Examples:
 List all certificates that will expire in less then 30 days
 # lectl -e=30 -a
+
 List raw output of openssl x509 command for example.com
-# letctl -r example.com
+# lectl -r example.com
+
 Output only nuber of days till certificate of example.com expires
-# letctl -s -e example.com"
+# lectl -s -e example.com"
 
 
 EXPECTED_ARGS=1
