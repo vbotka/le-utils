@@ -2,33 +2,43 @@
 #set -x
 
 # tested with FreeBSD 10.3
+LETSENCRYPT="/usr/local/bin/letsencrypt"
 LEROOT="/usr/local/etc/letsencrypt"
 OPENSSL="/usr/bin/openssl"
 X509OPTS="x509 -dates -email -issuer -subject -serial -noout -in"
+WEBSERVER="apache"
+APACHECTL="/usr/local/sbin/apachectl"
+MAILSERVER="postfix"
+
+[ -f /etc/le-utils ] && . /etc/le-utils
 [ -f ~/.le-utils ] && . ~/.le-utils
 
 
 USAGE="$(basename "$0") [-h|--help] [-l|--list] [-e|--expire] [-d|--days=NoOfDays] [-r|--raw] [-s|--silent]
-          [-a|--all|<domain>] -- Letsencrypt certificates management
+      [-c|--renew] [-n|--dryrun] [-a|--all|<domain>] -- Letsencrypt certificates management
+
 Where:
-    -h --help             show this help
-    -l --list             list domains
-    -e --expire           show number of days till certificate expires
-    -d --days=NoOfDays    with -e list certificates that will expire in period of NoOfDays
-    -r --raw              show raw openssl output
-    -s --silent           with -e only report number of days to expire
-    -a --all              check all domains
-    <domain>              check domain
+    -h --help            show this help
+    -l --list            list domains
+    -e --expire          show number of days till certificate expires
+    -d --days=NoOfDays   with -e list certificates that will expire in period of NoOfDays
+    -r --raw             show raw openssl output
+    -s --silent          with -e only report number of days to expire
+    -c --renew           renew cerficates
+    -n --dryrun          with -c dry run only
+    -a --all             check all domains
+    <domain>             check domain (Note 1,  )
 
 Examples:
 List all certificates that will expire in less then 30 days
-# lectl -e=30 -a
-
+# lectl -e -d=30 -a
 List raw output of openssl x509 command for example.com
 # lectl -r example.com
+Dry run renew all certificates
+# lectl -n -c -a
 
-Output only nuber of days till certificate of example.com expires
-# lectl -s -e example.com"
+Note 1: # /usr/local/bin/letsencrypt renew  --dry-run -d example.com
+Currently, the renew verb is only capable of renewing all installed certificates that are due to be renewed; individual domains cannot be specified with this action. If you would like to renew specific certificates, use the certonly command. The renew verb may provide other options for selecting certificates to renew in the future."
 
 
 EXPECTED_ARGS=1
@@ -37,13 +47,35 @@ if [ $# -lt $EXPECTED_ARGS ]; then
     exit
 fi
 
+function le-mode {
+    case $MODE in
+        1)
+            (($ALLDOMAINS)) && le-cert-info-all || le-cert-info
+            ;;
+        2)
+	    le-webserver-stop
+            le-cert-renew
+	    le-webserver-restart
+            ;;
+        *)
+	    printf "[ERR] lectl: Unknown mode: $MODE\n"
+            exit
+            ;;
+    esac
+}
 
 function bsd-date {
-	BSDDATE=$(LC_ALL=C date -j -f "%b %d %T %Y %Z" "$DATE")
-	BSDSEC=$(LC_ALL=C date -j -f "%b %d %T %Y %Z" "$DATE" "+%s")
-	EXPSEC=$(($BSDSEC - $(LC_ALL=C date +%s)))
-	EXPDAYS=$(($EXPSEC / 86400))
-	}
+    BSDDATE=$(LC_ALL=C date -j -f "%b %d %T %Y %Z" "$DATE")
+    BSDSEC=$(LC_ALL=C date -j -f "%b %d %T %Y %Z" "$DATE" "+%s")
+    EXPSEC=$(($BSDSEC - $(LC_ALL=C date +%s)))
+    EXPDAYS=$(($EXPSEC / 86400))
+}
+
+function le-cert-info-all {
+    for DOMAIN in $DOMAINS; do
+	le-cert-info
+    done
+}
 
 function le-cert-info {
     if  LOG=$(LC_ALL=C $OPENSSL $X509OPTS $LEROOT/live/$DOMAIN/fullchain.pem 2>&1); then
@@ -58,19 +90,82 @@ function le-cert-info {
 	    if [[ $EXPIRE = 1 ]]; then
 		DATE=$NOTAFTER; bsd-date
 		[ $EXPDAYS -lt $DAYS ] && printf "$EXPDAYS"
-		[ $EXPDAYS -lt $DAYS ] &&(($VERBOSE)) && printf " days to the expiration of $DOMAIN\n"
+		[ $EXPDAYS -lt $DAYS ] && (($VERBOSE)) && printf " days to the expiration of $DOMAIN\n"
 	    else
 		printf "[$NOTBEFORE] [$NOTAFTER] [$ISSUER] [$SUBJECT]\n"
 	    fi
 	fi
     else
-	printf "[ERR]: $LOG"
+	printf "[ERR] $LOG"
     fi
-    }
+}
 
+function le-cert-renew {
+# (($ALLDOMAINS)) && $LETSENCRYPT renew $DRYRUN || $LETSENCRYPT renew $DRYRUN -d $DOMAIN
+(($ALLDOMAINS)) && $LETSENCRYPT renew $DRYRUN || printf "|Renewal of single certificate not available atm\n"
+#    if  LOG=$($LETSENCRYPT renew $DRYRUN  2>&1); then
+#	printf "[OK] $LOG"
+#    else
+#	printf "[ERR] $LOG"
+#    fi
+}
+
+# TODO: WEBSERVERRUNNING 0/1
+function le-webserver-status {
+    case $WEBSERVER in
+        apache|APACHE)
+            $APACHECTL status
+            ;;
+        *)
+	    printf "[ERR] lectl: Unknown webserver: $WEBSERVER\n"
+            exit
+            ;;
+    esac
+}
+
+function le-webserver-stop {
+    case $WEBSERVER in
+        apache|APACHE)
+            if  LOG=$($APACHECTL -k graceful-stop 2>&1); then
+		(($VERBOSE)) && printf "$WEBSERVER stopped\n"
+	    else
+		printf "[ERR] lectl: Stop of $WEBSERVER failed\n"
+		printf "[ERR] lectl: $LOG\n"
+		exit 99
+	    fi
+            ;;
+        *)
+	    printf "[ERR] lectl: Unknown webserver: $WEBSERVER\n"
+            exit 99
+            ;;
+    esac
+}
+
+function le-webserver-restart {
+    case $WEBSERVER in
+        apache|APACHE)
+            if  LOG=$($APACHECTL -k graceful 2>&1); then
+		(($VERBOSE)) && printf "$WEBSERVER restarted\n"
+	    else
+		printf "[ERR] lectl: Restart of $WEBSERVER failed\n"
+		printf "[ERR] lectl: $LOG\n"
+		exit 99
+	    fi
+            ;;
+        *)
+	    printf "[ERR] lectl: Unknown webserver: $WEBSERVER\n"
+            exit 99
+            ;;
+    esac
+}
+
+
+MODE=1 # 1-info 2-renew
+ALLDOMAINS=0
 VERBOSE=1
 EXPIRE=0
 RAW=0
+DRYRUN=""
 DAYS=999999
 DOMAINS=$(cd $LEROOT/live; ls -1)
 for i in "$@"; do
@@ -79,31 +174,37 @@ for i in "$@"; do
             echo "$USAGE"
             exit
             ;;
+        -l|--list)
+            printf "$DOMAINS\n"
+            exit
+            ;;
 	-e|--expire)
 	    EXPIRE=1
 	    ;;
 	-d=*|--days=*)
 	    DAYS="${i#*=}"
 	    ;;
-        -l|--list)
-            printf "$DOMAINS\n"
-            exit
-            ;;
         -r|--raw)
             RAW=1
             ;;
         -s|--silent)
             VERBOSE=0
             ;;
+        -c|--renew)
+	    MODE=2
+            ;;
+        -n|--dryrun)
+            DRYRUN=" --dry-run"
+            ;;
         -a|--all)
-            for DOMAIN in $DOMAINS; do
-                le-cert-info
-            done
+	    ALLDOMAINS=1
+	    le-mode
             ;;
         *)
             if [[ $DOMAINS =~ $i ]] ; then
                 DOMAIN=$i
-                le-cert-info
+		ALLDOMAINS=0
+                le-mode
             else
                 printf "[ERR] lectl: Unknown domain $i\n"
             fi
@@ -112,7 +213,3 @@ for i in "$@"; do
 done
 
 exit
-
-#/usr/local/etc/rc.d/apache24 stop
-#/usr/local/bin/letsencrypt renew --dry-run --quiet
-#/usr/local/etc/rc.d/apache24 start
