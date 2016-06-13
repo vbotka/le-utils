@@ -13,9 +13,9 @@ APACHECTL="/usr/local/sbin/apachectl"
 APACHESTATUS="$APACHECTL status"
 #APACHESTATUS="/usr/local/etc/rc.d/$APACHE status"
 APACHESTOP="$APACHECTL -k graceful-stop"
-#APACHESTATUS="/usr/local/etc/rc.d/$APACHE gracefulstop"
+#APACHESTOP="/usr/local/etc/rc.d/$APACHE gracefulstop"
 APACHERESTART="$APACHECTL -k graceful"
-#APACHESTATUS="/usr/local/etc/rc.d/$APACHE graceful"
+#APACHESTART="/usr/local/etc/rc.d/$APACHE graceful"
 #
 MAILSERVER="postfix"
 
