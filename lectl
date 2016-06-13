@@ -1,13 +1,22 @@
 #!/usr/local/bin/bash
 #set -x
-
 # tested with FreeBSD 10.3
+
 LETSENCRYPT="/usr/local/bin/letsencrypt"
 LEROOT="/usr/local/etc/letsencrypt"
 OPENSSL="/usr/bin/openssl"
 X509OPTS="x509 -dates -email -issuer -subject -serial -noout -in"
+#
 WEBSERVER="apache"
+#APACHE="apache24"
 APACHECTL="/usr/local/sbin/apachectl"
+APACHESTATUS="$APACHECTL status"
+#APACHESTATUS="/usr/local/etc/rc.d/$APACHE status"
+APACHESTOP="$APACHECTL -k graceful-stop"
+#APACHESTATUS="/usr/local/etc/rc.d/$APACHE gracefulstop"
+APACHERESTART="$APACHECTL -k graceful"
+#APACHESTATUS="/usr/local/etc/rc.d/$APACHE graceful"
+#
 MAILSERVER="postfix"
 
 [ -f /etc/le-utils ] && . /etc/le-utils
@@ -24,21 +33,43 @@ Where:
     -d --days=NoOfDays   with -e list certificates that will expire in period of NoOfDays
     -r --raw             show raw openssl output
     -s --silent          with -e only report number of days to expire
-    -c --renew           renew cerficates
+    -c --renew           renew cerficates (Note 2,3)
     -n --dryrun          with -c dry run only
     -a --all             check all domains
-    <domain>             check domain (Note 1,  )
+    <domain>             check domain (Note 1)
 
 Examples:
+Show information about all domains
+# lectl -a
+Show raw output of openssl x509 command for example.com
+# lectl -r example.com
 List all certificates that will expire in less then 30 days
 # lectl -e -d=30 -a
-List raw output of openssl x509 command for example.com
-# lectl -r example.com
-Dry run renew all certificates
+Dry run renewal of all certificates (run daily in cron for feedback)
 # lectl -n -c -a
 
-Note 1: # /usr/local/bin/letsencrypt renew  --dry-run -d example.com
-Currently, the renew verb is only capable of renewing all installed certificates that are due to be renewed; individual domains cannot be specified with this action. If you would like to renew specific certificates, use the certonly command. The renew verb may provide other options for selecting certificates to renew in the future."
+Note 1: Renewal of single ceritificate
+# /usr/local/bin/letsencrypt renew  --dry-run -d example.com
+Currently, the renew verb is only capable of renewing all installed
+certificates that are due to be renewed; individual domains cannot be
+specified with this action. If you would like to renew specific
+certificates, use the certonly command. The renew verb may provide
+other options for selecting certificates to renew in the future.
+
+Note 2: Rate Limits for Let’s Encrypt
+https://community.letsencrypt.org/t/rate-limits-for-lets-encrypt
+* limited to 20 certificates per domain per week
+* limited to 5 certificates per FQDN set per week
+* the number of registrations you can make in a given time period;
+  currently 500 per 3 hours
+
+Note 3: Lifetime of the certificate (Pros and cons of 90-day
+certificate lifetimes)
+https://community.letsencrypt.org/t/pros-and-cons-of-90-day-certificate-lifetimes
+The Technical Advisory Board chose
+* 90-day certificate lifetime to start with
+* with an expectation that people will want to auto-renew at the
+  60-day mark."
 
 
 EXPECTED_ARGS=1
@@ -114,7 +145,7 @@ function le-cert-renew {
 function le-webserver-status {
     case $WEBSERVER in
         apache|APACHE)
-            $APACHECTL status
+            $APACHESTATUS
             ;;
         *)
 	    printf "[ERR] lectl: Unknown webserver: $WEBSERVER\n"
@@ -126,7 +157,7 @@ function le-webserver-status {
 function le-webserver-stop {
     case $WEBSERVER in
         apache|APACHE)
-            if  LOG=$($APACHECTL -k graceful-stop 2>&1); then
+            if  LOG=$($APACHESTOP 2>&1); then
 		(($VERBOSE)) && printf "$WEBSERVER stopped\n"
 	    else
 		printf "[ERR] lectl: Stop of $WEBSERVER failed\n"
@@ -144,7 +175,7 @@ function le-webserver-stop {
 function le-webserver-restart {
     case $WEBSERVER in
         apache|APACHE)
-            if  LOG=$($APACHECTL -k graceful 2>&1); then
+            if  LOG=$($APACHERESTART 2>&1); then
 		(($VERBOSE)) && printf "$WEBSERVER restarted\n"
 	    else
 		printf "[ERR] lectl: Restart of $WEBSERVER failed\n"
