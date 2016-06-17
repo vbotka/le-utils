@@ -78,7 +78,7 @@ if [ $# -lt $EXPECTED_ARGS ]; then
     exit
 fi
 
-function le-mode {
+function le-main {
     case $MODE in
         1)
             (($ALLDOMAINS)) && le-cert-info-all || le-cert-info
@@ -229,13 +229,13 @@ for i in "$@"; do
             ;;
         -a|--all)
 	    ALLDOMAINS=1
-	    le-mode
+	    le-main
             ;;
         *)
             if [[ $DOMAINS =~ $i ]] ; then
                 DOMAIN=$i
 		ALLDOMAINS=0
-                le-mode
+                le-main
             else
                 printf "[ERR] lectl: Unknown domain $i\n"
             fi
