@@ -26,7 +26,7 @@ MAILSERVER="postfix"
 USAGE="$(basename "$0") [-h|--help] [-l|--list] [-e|--expire] [-d|--days=NoOfDays] [-r|--raw] [-s|--silent]
       [-c|--renew] [-n|--dryrun] [-a|--all|<domain>] -- Letsencrypt certificates management
 
-Where:
+WHERE:
     -h --help            show this help
     -l --list            list domains
     -e --expire          show number of days till certificate expires
@@ -38,17 +38,21 @@ Where:
     -a --all             check all domains
     <domain>             check domain (Note 1)
 
-Examples:
+EXAMPLES:
 Show information about all domains
 # lectl -a
+
 Show raw output of openssl x509 command for example.com
 # lectl -r example.com
+
 List all certificates that will expire in less then 30 days
 # lectl -e -d=30 -a
+
 Dry run renewal of all certificates (run daily in cron for feedback)
 # lectl -n -c -a
 
-Note 1: Renewal of single ceritificate
+NOTES:
+1) Renewal of single ceritificate
 # /usr/local/bin/letsencrypt renew  --dry-run -d example.com
 Currently, the renew verb is only capable of renewing all installed
 certificates that are due to be renewed; individual domains cannot be
@@ -56,14 +60,14 @@ specified with this action. If you would like to renew specific
 certificates, use the certonly command. The renew verb may provide
 other options for selecting certificates to renew in the future.
 
-Note 2: Rate Limits for Let’s Encrypt
+2) Rate Limits for Let’s Encrypt
 https://community.letsencrypt.org/t/rate-limits-for-lets-encrypt
 * limited to 20 certificates per domain per week
 * limited to 5 certificates per FQDN set per week
 * the number of registrations you can make in a given time period;
   currently 500 per 3 hours
 
-Note 3: Lifetime of the certificate (Pros and cons of 90-day
+3) Lifetime of the certificate (Pros and cons of 90-day
 certificate lifetimes)
 https://community.letsencrypt.org/t/pros-and-cons-of-90-day-certificate-lifetimes
 The Technical Advisory Board chose
