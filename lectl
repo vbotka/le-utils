@@ -2,11 +2,8 @@
 #set -x
 # tested with FreeBSD 10.3
 
-# TODO:
-# 1) -s with -n shall report nothing if succeeds (for cron)
-# 2) -s with -d shall report notning if no certs expire in -n days (for cron)
-
-LETSENCRYPT="/usr/local/bin/letsencrypt"
+VERSION="0.2"
+LETSENCRYPT="/usr/local/bin/certbot"
 LEROOT="/usr/local/etc/letsencrypt"
 OPENSSL="/usr/bin/openssl"
 X509OPTS="x509 -dates -email -issuer -subject -serial -noout -in"
@@ -27,10 +24,12 @@ MAILSERVER="postfix"
 [ -f ~/.le-utils ] && . ~/.le-utils
 
 
-USAGE="$(basename "$0") [-h|--help] [-l|--list] [-e|--expire] [-d|--days=NoOfDays] [-r|--raw] [-s|--silent]
-      [-c|--renew] [-n|--dryrun] [-a|--all|<domain>] -- Letsencrypt certificates management
+USAGE="$(basename "$0") [-v|--version -h|--help] [-l|--list] [-e|--expire] [-d|--days=NoOfDays]
+      [-r|--raw] [-s|--silent] [-c|--renew] [-n|--dryrun] [-a|--all|<domain>]
+      -- Letsencrypt certificates management
 
 WHERE:
+    -v --version         print version
     -h --help            show this help
     -l --list            list domains
     -e --expire          show number of days till certificate expires
@@ -57,7 +56,7 @@ Dry run renewal of all certificates (run daily in cron for feedback)
 
 NOTES:
 1) Renewal of single ceritificate
-# /usr/local/bin/letsencrypt renew  --dry-run -d example.com
+# /usr/local/bin/letsencrypt(certbot) renew --dry-run -d example.com
 Currently, the renew verb is only capable of renewing all installed
 certificates that are due to be renewed; individual domains cannot be
 specified with this action. If you would like to renew specific
@@ -88,10 +87,10 @@ fi
 
 function le-main {
     case $MODE in
-        1)
+        1)  # info
             (($ALLDOMAINS)) && le-cert-info-all || le-cert-info
             ;;
-        2)
+        2)  # renewal
 	    le-webserver-stop
             le-cert-renew
 	    le-webserver-restart
@@ -209,6 +208,10 @@ DAYS=999999
 DOMAINS=$(cd $LEROOT/live; ls -1)
 for i in "$@"; do
     case $i in
+        -v|--version)
+	    printf "$VERSION\n"
+            exit
+            ;;
         -h|--help)
             echo "$USAGE"
             exit
