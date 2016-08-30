@@ -1,8 +1,8 @@
 #!/usr/local/bin/bash
 #set -x
-# tested with FreeBSD 10.3
 
 VERSION="0.2"
+
 LETSENCRYPT="/usr/local/bin/certbot"
 LEROOT="/usr/local/etc/letsencrypt"
 OPENSSL="/usr/bin/openssl"
@@ -21,11 +21,14 @@ APACHERESTART="$APACHECTL -k graceful"
 MAILSERVER="postfix"
 
 [ -f /etc/le-utils ] && . /etc/le-utils
+[ -f /usr/local/etc/le-utils ] && . /usr/local/etc/le-utils
 [ -f ~/.le-utils ] && . ~/.le-utils
+[ -f ./.le-utils ] && . ./.le-utils
 
 
-USAGE="$(basename "$0") [-v|--version -h|--help] [-l|--list] [-e|--expire] [-d|--days=NoOfDays]
-      [-r|--raw] [-s|--silent] [-c|--renew] [-n|--dryrun] [-a|--all|<domain>]
+USAGE="
+lectl [-v|--version -h|--help] [-l|--list] [-e|--expire] [-d|--days=NoOfDays]
+      [-r|--raw] [-s|--silent] [-c|--renew] [-n|--dryrun] [-a|--all|<CN>]
       -- Letsencrypt certificates management
 
 WHERE:
@@ -38,8 +41,8 @@ WHERE:
     -s --silent          with -e only report number of days to expire
     -c --renew           renew cerficates (Note 2,3)
     -n --dryrun          with -c dry run only
-    -a --all             check all domains
-    <domain>             check domain (Note 1)
+    -a --all             check all domains (CN)
+    <CN>             check domain (CN)(Note 1)
 
 EXAMPLES:
 Show information about all domains
@@ -85,6 +88,7 @@ if [ $# -lt $EXPECTED_ARGS ]; then
     exit
 fi
 
+
 function le-main {
     case $MODE in
         1)  # info
@@ -93,6 +97,7 @@ function le-main {
         2)  # renewal
 	    le-webserver-stop
             le-cert-renew
+	    # TODO: do not start apache if it had not run before stop was issued.
 	    le-webserver-restart
             ;;
         *)
@@ -134,21 +139,16 @@ function le-cert-info {
 	    fi
 	fi
     else
-	printf "[ERR] $LOG"
+	printf "[ERR] lectl: $LOG\n"
     fi
 }
 
 function le-cert-renew {
 # (($ALLDOMAINS)) && $LETSENCRYPT renew $DRYRUN || $LETSENCRYPT renew $DRYRUN -d $DOMAIN
 (($ALLDOMAINS)) && $LETSENCRYPT renew $DRYRUN || printf "|Renewal of single certificate not available atm\n"
-#    if  LOG=$($LETSENCRYPT renew $DRYRUN  2>&1); then
-#	printf "[OK] $LOG"
-#    else
-#	printf "[ERR] $LOG"
-#    fi
+# TODO: check status and write log.
 }
 
-# TODO: WEBSERVERRUNNING 0/1
 function le-webserver-status {
     case $WEBSERVER in
         apache|APACHE)
@@ -165,7 +165,7 @@ function le-webserver-stop {
     case $WEBSERVER in
         apache|APACHE)
             if  LOG=$($APACHESTOP 2>&1); then
-		(($VERBOSE)) && printf "$WEBSERVER stopped\n"
+		(($VERBOSE)) && printf "[OK]  lectl: $WEBSERVER stopped\n"
 	    else
 		printf "[ERR] lectl: Stop of $WEBSERVER failed\n"
 		printf "[ERR] lectl: $LOG\n"
@@ -183,7 +183,7 @@ function le-webserver-restart {
     case $WEBSERVER in
         apache|APACHE)
             if  LOG=$($APACHERESTART 2>&1); then
-		(($VERBOSE)) && printf "$WEBSERVER restarted\n"
+		(($VERBOSE)) && printf "[OK]  lectl: $WEBSERVER restarted\n"
 	    else
 		printf "[ERR] lectl: Restart of $WEBSERVER failed\n"
 		printf "[ERR] lectl: $LOG\n"
