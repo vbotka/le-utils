@@ -1,7 +1,8 @@
 #!/usr/local/bin/bash
 #set -x
 
-VERSION="0.2.1"
+VERSION="0.2-CURRENT"
+#VERSION="0.2.1"
 
 LETSENCRYPT="/usr/local/bin/certbot"
 LEROOT="/usr/local/etc/letsencrypt"
@@ -32,17 +33,17 @@ lectl [-v|--version -h|--help] [-l|--list] [-e|--expire] [-d|--days=NoOfDays]
       -- Letsencrypt certificates management
 
 WHERE:
-    -v --version         print version
-    -h --help            show this help
-    -l --list            list domains
-    -e --expire          show number of days till certificate expires
-    -d --days=NoOfDays   with -e list certificates that will expire in period of NoOfDays
-    -r --raw             show raw openssl output
-    -s --silent          with -e only report number of days to expire
-    -c --renew           renew cerficates (Note 2,3)
-    -n --dryrun          with -c dry run only
-    -a --all             check all domains (CN)
-    <CN>             check domain (CN)(Note 1)
+ -v --version         print version
+ -h --help            show this help
+ -l --list            list domains
+ -e --expire          show number of days till certificate expires
+ -d --days=NoOfDays   with -e list certificates that will expire in period of NoOfDays
+ -r --raw             show raw openssl output
+ -s --silent          with -e only report number of days to expire
+ -c --renew           renew cerficates (Note 2,3)
+ -n --dryrun          with -c dry run only
+ -a --all             check all domains (CN)
+ <CN>                 check domain (CN)(Note 1)
 
 EXAMPLES:
 Show information about all domains
