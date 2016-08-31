@@ -1,8 +1,8 @@
 #!/usr/local/bin/bash
 #set -x
 
-VERSION="0.2-CURRENT"
-#VERSION="0.2.1"
+#VERSION="0.2-CURRENT"
+VERSION="0.2.2"
 
 LETSENCRYPT="/usr/local/bin/certbot"
 LEROOT="/usr/local/etc/letsencrypt"
@@ -20,6 +20,9 @@ APACHERESTART="$APACHECTL -k graceful"
 #APACHESTART="/usr/local/etc/rc.d/$APACHE graceful"
 #
 MAILSERVER="postfix"
+#
+LOGTOFILE="1"
+LOGFILE="/var/log/le-utils"
 
 [ -f /etc/le-utils ] && . /etc/le-utils
 [ -f /usr/local/etc/le-utils ] && . /usr/local/etc/le-utils
@@ -28,37 +31,40 @@ MAILSERVER="postfix"
 
 
 USAGE="
-lectl [-v|--version -h|--help] [-l|--list] [-e|--expire] [-d|--days=NoOfDays]
-      [-r|--raw] [-s|--silent] [-c|--renew] [-n|--dryrun] [-a|--all|<CN>]
+lectl [-v|--version] [-h|--help] [-s|--silent] [-d|--debug]
+      [-l|--list] [-r|--raw]
+      [-e|--expire] [-D=NoOfDays|--Days=NoOfDays]
+      [-c|--renew] [-n|--dryrun] [-a|--all|<CN>]
       -- Letsencrypt certificates management
 
-WHERE:
- -v --version         print version
- -h --help            show this help
- -l --list            list domains
- -e --expire          show number of days till certificate expires
- -d --days=NoOfDays   with -e list certificates that will expire in period of NoOfDays
- -r --raw             show raw openssl output
- -s --silent          with -e only report number of days to expire
- -c --renew           renew cerficates (Note 2,3)
- -n --dryrun          with -c dry run only
- -a --all             check all domains (CN)
- <CN>                 check domain (CN)(Note 1)
+where:
+ -v --version ....... print version end exit
+ -h --help .......... show this help and exit
+ -l --list .......... list domains and exit
+ -r --raw ........... print raw output of openssl x509 command
+ -e --expire ........ show number of days till certificate expires
+ -D --Days=NoOfDays . with -e list certificates that will expire in period of NoOfDays
+ -s --silent ........ print errors only; with -e only report number of days to expire
+ -d --debug ......... print debug output
+ -c --renew ......... renew cerficates (Note 2,3)
+ -n --dryrun ........ with -c dry run only
+ -a --all ........... check all domains (CN)
+ <CN> ............... check domain (CN)(Note 1)
 
-EXAMPLES:
-Show information about all domains
+Examples:
+Print information about all domains
 # lectl -a
 
-Show raw output of openssl x509 command for example.com
+Print raw output of openssl x509 command for example.com
 # lectl -r example.com
 
 List all certificates that will expire in less then 30 days
-# lectl -e -d=30 -a
+# lectl -e --Days=30 -a
 
 Dry run renewal of all certificates (run daily in cron for feedback)
 # lectl -n -c -a
 
-NOTES:
+Notes:
 1) Renewal of single ceritificate
 # /usr/local/bin/letsencrypt(certbot) renew --dry-run -d example.com
 Currently, the renew verb is only capable of renewing all installed
@@ -90,6 +96,21 @@ if [ $# -lt $EXPECTED_ARGS ]; then
 fi
 
 
+function log-ok {
+    (($VERBOSE)) && printf "[OK]  lectl: $MESSAGE\n"
+    (($LOGTOFILE)) && printf "`date "+%F %T"` [OK]  lectl: $MESSAGE\n" >> $LOGFILE
+}
+function log-dbg {
+    if [ $DEBUG -eq 1 ]; then
+	printf "[DBG] lectl: $MESSAGE\n"
+	(($LOGTOFILE)) && printf "`date "+%F %T"` [DBG] lectl: $MESSAGE\n" >> $LOGFILE
+    fi
+}
+function log-err {
+    printf "[ERR] lectl: $MESSAGE\n"
+    (($LOGTOFILE)) && printf "`date "+%F %T"` [ERR] lectl: $MESSAGE\n" >> $LOGFILE
+}
+
 function le-main {
     case $MODE in
         1)  # info
@@ -102,7 +123,7 @@ function le-main {
 	    le-webserver-restart
             ;;
         *)
-	    printf "[ERR] lectl: Unknown mode: $MODE\n"
+	    MESSAGE=" Unknown mode: $MODE"; log-err
             exit
             ;;
     esac
@@ -140,14 +161,24 @@ function le-cert-info {
 	    fi
 	fi
     else
-	printf "[ERR] lectl: $LOG\n"
+	MESSAGE=" $LOG"; log-err
     fi
 }
 
 function le-cert-renew {
-# (($ALLDOMAINS)) && $LETSENCRYPT renew $DRYRUN || $LETSENCRYPT renew $DRYRUN -d $DOMAIN
-(($ALLDOMAINS)) && $LETSENCRYPT renew $DRYRUN || printf "|Renewal of single certificate not available atm\n"
-# TODO: check status and write log.
+    # (($ALLDOMAINS)) && $LETSENCRYPT renew $DRYRUN || $LETSENCRYPT renew $DRYRUN -d $DOMAIN
+    if [ $ALLDOMAINS -eq 0 ]; then
+	MESSAGE=" Renewal of single certificate not available"; log-err
+	exit
+    else
+	if LOG=$($LETSENCRYPT renew $DRYRUN  2>&1); then
+	    [[ ! -z $LOG ]] && (MESSAGE=" $LETSENCRYPT log: \n$LOG"; log-ok)
+	    MESSAGE=" $LETSENCRYPT renew $DRYRUN finished"; log-ok
+	else
+	    MESSAGE=" $LETSENCRYPT renew $DRYRUN error: $?"; log-err
+	    MESSAGE=" $LETSENCRYPT renew $DRYRUN log: \n$LOG"; log-err
+	fi
+    fi
 }
 
 function le-webserver-status {
@@ -156,7 +187,7 @@ function le-webserver-status {
             $APACHESTATUS
             ;;
         *)
-	    printf "[ERR] lectl: Unknown webserver: $WEBSERVER\n"
+	    MESSAGE=" Unknown webserver: $WEBSERVER"; log-err
             exit
             ;;
     esac
@@ -166,15 +197,15 @@ function le-webserver-stop {
     case $WEBSERVER in
         apache|APACHE)
             if  LOG=$($APACHESTOP 2>&1); then
-		(($VERBOSE)) && printf "[OK]  lectl: $WEBSERVER stopped\n"
+		MESSAGE=" $WEBSERVER stopped"; log-ok
 	    else
-		printf "[ERR] lectl: Stop of $WEBSERVER failed\n"
-		printf "[ERR] lectl: $LOG\n"
+		MESSAGE=" Stop of $WEBSERVER failed"; log-err
+		MESSAGE=" $LOG"; log-err
 		exit 99
 	    fi
             ;;
         *)
-	    printf "[ERR] lectl: Unknown webserver: $WEBSERVER\n"
+	    MESSAGE=" Unknown webserver: $WEBSERVER"; log-err
             exit 99
             ;;
     esac
@@ -184,28 +215,29 @@ function le-webserver-restart {
     case $WEBSERVER in
         apache|APACHE)
             if  LOG=$($APACHERESTART 2>&1); then
-		(($VERBOSE)) && printf "[OK]  lectl: $WEBSERVER restarted\n"
+		MESSAGE=" $WEBSERVER restarted"; log-ok
 	    else
-		printf "[ERR] lectl: Restart of $WEBSERVER failed\n"
-		printf "[ERR] lectl: $LOG\n"
+		MESSAGE=" Restart of $WEBSERVER failed"; log-err
+		MESSAGE=" $LOG"; log-err
 		exit 99
 	    fi
             ;;
         *)
-	    printf "[ERR] lectl: Unknown webserver: $WEBSERVER\n"
+	    MESSAGE=" Unknown webserver: $WEBSERVER"; log-err
             exit 99
             ;;
     esac
 }
 
 
-MODE=1 # 1-info 2-renew
-ALLDOMAINS=0
-VERBOSE=1
-EXPIRE=0
-RAW=0
+MODE="1" # 1-info 2-renew
+ALLDOMAINS="0"
+VERBOSE="1"
+DEBUG="0"
+EXPIRE="0"
+RAW="0"
 DRYRUN=""
-DAYS=999999
+DAYS="999999"
 DOMAINS=$(cd $LEROOT/live; ls -1)
 for i in "$@"; do
     case $i in
@@ -214,7 +246,7 @@ for i in "$@"; do
             exit
             ;;
         -h|--help)
-            echo "$USAGE"
+            printf "$USAGE\n"
             exit
             ;;
         -l|--list)
@@ -222,34 +254,37 @@ for i in "$@"; do
             exit
             ;;
 	-e|--expire)
-	    EXPIRE=1
+	    EXPIRE="1"
 	    ;;
-	-d=*|--days=*)
+	-D=*|--Days=*)
 	    DAYS="${i#*=}"
 	    ;;
         -r|--raw)
-            RAW=1
+            RAW="1"
             ;;
         -s|--silent)
-            VERBOSE=0
+            VERBOSE="0"
+            ;;
+        -d|--debug)
+            DEBUG="0"
             ;;
         -c|--renew)
-	    MODE=2
+	    MODE="2"
             ;;
         -n|--dryrun)
             DRYRUN=" --dry-run"
             ;;
         -a|--all)
-	    ALLDOMAINS=1
+	    ALLDOMAINS="1"
 	    le-main
             ;;
         *)
-            if [[ $DOMAINS =~ $i ]] ; then
+            if [[ $DOMAINS =~ $i ]]; then
                 DOMAIN=$i
-		ALLDOMAINS=0
+		ALLDOMAINS="0"
                 le-main
             else
-                printf "[ERR] lectl: Unknown domain $i\n"
+                MESSAGE=" Unknown domain $i"; log-err
             fi
             ;;
     esac
