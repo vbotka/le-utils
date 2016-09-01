@@ -31,14 +31,14 @@ LOGFILE="/var/log/le-utils"
 
 
 USAGE="
-lectl [-v|--version] [-h|--help] [-s|--silent] [-d|--debug]
+lectl [-V|--version] [-h|--help] [-s|--silent] [-d|--debug]
       [-l|--list] [-r|--raw]
       [-e|--expire] [-D=NoOfDays|--Days=NoOfDays]
       [-c|--renew] [-n|--dryrun] [-a|--all|<CN>]
       -- Letsencrypt certificates management
 
 where:
- -v --version ....... print version end exit
+ -V --version ....... print version end exit
  -h --help .......... show this help and exit
  -l --list .......... list domains and exit
  -r --raw ........... print raw output of openssl x509 command
@@ -241,7 +241,7 @@ DAYS="999999"
 DOMAINS=$(cd $LEROOT/live; ls -1)
 for i in "$@"; do
     case $i in
-        -v|--version)
+        -V|--version)
 	    printf "$VERSION\n"
             exit
             ;;
