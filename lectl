@@ -1,8 +1,8 @@
 #!/usr/local/bin/bash
 #set -x
 
-#VERSION="0.2-CURRENT"
-VERSION="0.2.2"
+VERSION="0.2.3-CURRENT"
+#VERSION="0.2.2"
 
 LETSENCRYPT="/usr/local/bin/certbot"
 LEROOT="/usr/local/etc/letsencrypt"
@@ -10,13 +10,13 @@ OPENSSL="/usr/bin/openssl"
 X509OPTS="x509 -dates -email -issuer -subject -serial -noout -in"
 #
 WEBSERVER="apache"
-#APACHE="apache24"
 APACHECTL="/usr/local/sbin/apachectl"
 APACHESTATUS="$APACHECTL status"
-#APACHESTATUS="/usr/local/etc/rc.d/$APACHE status"
 APACHESTOP="$APACHECTL -k graceful-stop"
-#APACHESTOP="/usr/local/etc/rc.d/$APACHE gracefulstop"
 APACHERESTART="$APACHECTL -k graceful"
+#APACHE="apache24"
+#APACHESTATUS="/usr/local/etc/rc.d/$APACHE status"
+#APACHESTOP="/usr/local/etc/rc.d/$APACHE gracefulstop"
 #APACHESTART="/usr/local/etc/rc.d/$APACHE graceful"
 #
 MAILSERVER="postfix"
@@ -166,8 +166,8 @@ function le-cert-info {
 }
 
 function le-cert-renew {
-    # (($ALLDOMAINS)) && $LETSENCRYPT renew $DRYRUN || $LETSENCRYPT renew $DRYRUN -d $DOMAIN
     if [ $ALLDOMAINS -eq 0 ]; then
+	# $LETSENCRYPT renew $DRYRUN -d $DOMAIN
 	MESSAGE=" Renewal of single certificate not available"; log-err
 	exit
     else
@@ -266,7 +266,7 @@ for i in "$@"; do
             VERBOSE="0"
             ;;
         -d|--debug)
-            DEBUG="0"
+            DEBUG="1"
             ;;
         -c|--renew)
 	    MODE="2"
