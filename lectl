@@ -9,7 +9,8 @@ LEROOT="/usr/local/etc/letsencrypt"
 OPENSSL="/usr/bin/openssl"
 X509OPTS="x509 -dates -email -issuer -subject -serial -noout -in"
 #
-WEBSERVER="apache"
+#WEBSERVER="NONE"
+WEBSERVER="APACHE"
 APACHECTL="/usr/local/sbin/apachectl"
 APACHESTATUS="$APACHECTL status"
 APACHESTOP="$APACHECTL -k graceful-stop"
@@ -111,7 +112,29 @@ function log-err {
     (($LOGTOFILE)) && printf "`date "+%F %T"` [ERR] lectl: $MESSAGE\n" >> $LOGFILE
 }
 
+function print-config {
+    printf "[DBG] lectl: *** CONFIG\n"
+    printf "[DBG] lectl: LETSENCRYPT: $LETSENCRYPT\n"
+    printf "[DBG] lectl: LEROOT: $LEROOT\n"
+    printf "[DBG] lectl: OPENSSL: $OPENSSL\n"
+    printf "[DBG] lectl: X509OPTS: $X509OPTS\n"
+    printf "[DBG] lectl: LOGFILE: $LOGFILE\n"
+    printf "[DBG] lectl: WEBSERVER: $WEBSERVER\n"
+    printf "[DBG] lectl: MAILSERVER: $MAILSERVER\n"
+    printf "[DBG] lectl: MODE: $MODE\n"
+    printf "[DBG] lectl: ALLDOMAINS: $ALLDOMAINS\n"
+    printf "[DBG] lectl: VERBOSE: $VERBOSE\n"
+    printf "[DBG] lectl: DEBUG: $DEBUG\n"
+    printf "[DBG] lectl: EXPIRE: $EXPIRE\n"
+    printf "[DBG] lectl: RAW: $RAW\n"
+    printf "[DBG] lectl: DRYRUN: $DRYRUN\n"
+    printf "[DBG] lectl: DAYS: $DAYS\n"
+    printf "[DBG] lectl: DOMAINS:\n $DOMAINS\n"
+    printf "[DBG] lectl: ***\n"
+}
+
 function le-main {
+    (($DEBUG)) && print-config
     case $MODE in
         1)  # info
             (($ALLDOMAINS)) && le-cert-info-all || le-cert-info
@@ -183,18 +206,22 @@ function le-cert-renew {
 
 function le-webserver-status {
     case $WEBSERVER in
+        none|NONE)
+            ;;
         apache|APACHE)
             $APACHESTATUS
             ;;
         *)
 	    MESSAGE=" Unknown webserver: $WEBSERVER"; log-err
-            exit
+            exit 99
             ;;
     esac
 }
 
 function le-webserver-stop {
     case $WEBSERVER in
+        none|NONE)
+            ;;
         apache|APACHE)
             if  LOG=$($APACHESTOP 2>&1); then
 		MESSAGE=" $WEBSERVER stopped"; log-ok
@@ -213,6 +240,8 @@ function le-webserver-stop {
 
 function le-webserver-restart {
     case $WEBSERVER in
+        none|NONE)
+            ;;
         apache|APACHE)
             if  LOG=$($APACHERESTART 2>&1); then
 		MESSAGE=" $WEBSERVER restarted"; log-ok
@@ -290,4 +319,4 @@ for i in "$@"; do
     esac
 done
 
-exit
+exit 0
