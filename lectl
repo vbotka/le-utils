@@ -177,7 +177,7 @@ function le-cert-info {
 	    SERIAL=$(printf "${LOG}" | grep serial= | cut -d= -f 2)
 	    if [[ $EXPIRE = 1 ]]; then
 		DATE=$NOTAFTER; bsd-date
-		[ $EXPDAYS -lt $DAYS ] && printf "$EXPDAYS"
+		[ $EXPDAYS -lt $DAYS ] && printf "%d" "$EXPDAYS"
 		[ $EXPDAYS -lt $DAYS ] && (($VERBOSE)) && printf " days to the expiration of $DOMAIN\n"
 	    else
 		printf "[$NOTBEFORE] [$NOTAFTER] [$ISSUER] [$SUBJECT]\n"
