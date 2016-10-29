@@ -228,12 +228,11 @@ function le-webserver-stop {
 	    else
 		MESSAGE=" Stop of $WEBSERVER failed"; log-err
 		MESSAGE=" $LOG"; log-err
-		exit 99
 	    fi
             ;;
         *)
 	    MESSAGE=" Unknown webserver: $WEBSERVER"; log-err
-            exit 99
+	    exit 99
             ;;
     esac
 }
