@@ -4,10 +4,12 @@
 VERSION="0.2.3-CURRENT"
 #VERSION="0.2.2"
 
+#
 LETSENCRYPT="/usr/local/bin/certbot"
 LEROOT="/usr/local/etc/letsencrypt"
 OPENSSL="/usr/bin/openssl"
 X509OPTS="x509 -dates -email -issuer -subject -serial -noout -in"
+
 #
 #WEBSERVER="NONE"
 WEBSERVER="APACHE"
@@ -19,8 +21,11 @@ APACHERESTART="$APACHECTL -k graceful"
 #APACHESTATUS="/usr/local/etc/rc.d/$APACHE status"
 #APACHESTOP="/usr/local/etc/rc.d/$APACHE gracefulstop"
 #APACHESTART="/usr/local/etc/rc.d/$APACHE graceful"
+
 #
-MAILSERVER="postfix"
+MAILSERVER="NONE"
+#MAILSERVER="postfix"
+
 #
 LOGTOFILE="1"
 LOGFILE="/var/log/le-utils"
@@ -29,7 +34,6 @@ LOGFILE="/var/log/le-utils"
 [ -f /usr/local/etc/le-utils ] && . /usr/local/etc/le-utils
 [ -f ~/.le-utils ] && . ~/.le-utils
 [ -f ./.le-utils ] && . ./.le-utils
-
 
 USAGE="
 lectl [-V|--version] [-h|--help] [-s|--silent] [-d|--debug]
@@ -55,13 +59,10 @@ where:
 Examples:
 Print information about all domains
 # lectl -a
-
 Print raw output of openssl x509 command for example.com
 # lectl -r example.com
-
 List all certificates that will expire in less then 30 days
 # lectl -e --Days=30 -a
-
 Dry run renewal of all certificates (run daily in cron for feedback)
 # lectl -n -c -a
 
@@ -73,14 +74,12 @@ certificates that are due to be renewed; individual domains cannot be
 specified with this action. If you would like to renew specific
 certificates, use the certonly command. The renew verb may provide
 other options for selecting certificates to renew in the future.
-
 2) Rate Limits for Let’s Encrypt
 https://community.letsencrypt.org/t/rate-limits-for-lets-encrypt
 * limited to 20 certificates per domain per week
 * limited to 5 certificates per FQDN set per week
 * the number of registrations you can make in a given time period;
   currently 500 per 3 hours
-
 3) Lifetime of the certificate (Pros and cons of 90-day
 certificate lifetimes)
 https://community.letsencrypt.org/t/pros-and-cons-of-90-day-certificate-lifetimes
@@ -89,13 +88,11 @@ The Technical Advisory Board chose
 * with an expectation that people will want to auto-renew at the
   60-day mark."
 
-
 EXPECTED_ARGS=1
 if [ $# -lt $EXPECTED_ARGS ]; then
     echo "$USAGE"
     exit
 fi
-
 
 function log-ok {
     (($VERBOSE)) && printf "[OK]  lectl: $MESSAGE\n"
@@ -113,7 +110,7 @@ function log-err {
 }
 
 function print-config {
-    printf "[DBG] lectl: *** CONFIG\n"
+    printf "[DBG] lectl: >>> CONFIG\n"
     printf "[DBG] lectl: LETSENCRYPT: $LETSENCRYPT\n"
     printf "[DBG] lectl: LEROOT: $LEROOT\n"
     printf "[DBG] lectl: OPENSSL: $OPENSSL\n"
@@ -130,7 +127,7 @@ function print-config {
     printf "[DBG] lectl: DRYRUN: $DRYRUN\n"
     printf "[DBG] lectl: DAYS: $DAYS\n"
     printf "[DBG] lectl: DOMAINS:\n $DOMAINS\n"
-    printf "[DBG] lectl: ***\n"
+    printf "[DBG] lectl: <<< CONFIG\n"
 }
 
 function le-main {
@@ -207,12 +204,22 @@ function le-cert-renew {
 function le-webserver-status {
     case $WEBSERVER in
         none|NONE)
-            ;;
+        ;;
         apache|APACHE)
-            $APACHESTATUS
+	    if [ -e $APACHECTL ]; then
+		$APACHESTATUS
+		if  LOG=$($APACHESTATUS 2>&1); then
+		    MESSAGE=" $WEBSERVER status: $LOG"; log-ok
+		else
+		    MESSAGE=" le-webserver-status: Status of $WEBSERVER failed"; log-err
+		    MESSAGE=" le-webserver-status: $LOG"; log-err
+		fi
+	    else
+		MESSAGE=" le-webserver-status: Can't find $APACHECTL. Set WEBSERVER to NONE, if no webserver is installed."; log-err
+	    fi
             ;;
         *)
-	    MESSAGE=" Unknown webserver: $WEBSERVER"; log-err
+	    MESSAGE=" le-webserver-status: Unknown webserver: $WEBSERVER"; log-err
             exit 99
             ;;
     esac
@@ -221,17 +228,22 @@ function le-webserver-status {
 function le-webserver-stop {
     case $WEBSERVER in
         none|NONE)
-            ;;
+	    MESSAGE=" Webserver: $WEBSERVER"; log-ok
+        ;;
         apache|APACHE)
-            if  LOG=$($APACHESTOP 2>&1); then
-		MESSAGE=" $WEBSERVER stopped"; log-ok
+	    if [ -e $APACHECTL ]; then
+		if  LOG=$($APACHESTOP 2>&1); then
+		    MESSAGE=" $WEBSERVER stopped"; log-ok
+		else
+		    MESSAGE=" le-webserver-stop: Stop of $WEBSERVER failed"; log-err
+		    MESSAGE=" le-webserver-stop: $LOG"; log-err
+		fi
 	    else
-		MESSAGE=" Stop of $WEBSERVER failed"; log-err
-		MESSAGE=" $LOG"; log-err
+		MESSAGE=" le-webserver-stop: Can't find $APACHECTL. Set WEBSERVER to NONE, if no webserver is installed."; log-err
 	    fi
             ;;
         *)
-	    MESSAGE=" Unknown webserver: $WEBSERVER"; log-err
+	    MESSAGE=" le-webserver-stop: Unknown webserver: $WEBSERVER"; log-err
 	    exit 99
             ;;
     esac
@@ -240,23 +252,26 @@ function le-webserver-stop {
 function le-webserver-restart {
     case $WEBSERVER in
         none|NONE)
-            ;;
+        ;;
         apache|APACHE)
-            if  LOG=$($APACHERESTART 2>&1); then
-		MESSAGE=" $WEBSERVER restarted"; log-ok
+    	    if [ -e $APACHECTL ]; then
+		if  LOG=$($APACHERESTART 2>&1); then
+		    MESSAGE=" $WEBSERVER restarted"; log-ok
+		else
+		    MESSAGE=" le-webserver-restart: Restart of $WEBSERVER failed"; log-err
+		    MESSAGE=" le-webserver-restart: $LOG"; log-err
+		    exit 99
+		fi
 	    else
-		MESSAGE=" Restart of $WEBSERVER failed"; log-err
-		MESSAGE=" $LOG"; log-err
-		exit 99
+		MESSAGE=" le-webserver-restart: Can't find $APACHECTL. Set WEBSERVER to NONE, if no webserver is installed."; log-err
 	    fi
             ;;
         *)
-	    MESSAGE=" Unknown webserver: $WEBSERVER"; log-err
+	    MESSAGE=" le-webserver-restart: Unknown webserver: $WEBSERVER"; log-err
             exit 99
             ;;
     esac
 }
-
 
 MODE="1" # 1-info 2-renew
 ALLDOMAINS="0"
