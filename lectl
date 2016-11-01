@@ -1,8 +1,8 @@
 #!/usr/local/bin/bash
 #set -x
 
-#VERSION="0.2.4-CURRENT"
-VERSION="0.2.4"
+VERSION="0.2.4-CURRENT"
+#VERSION="0.2.4"
 
 #
 LETSENCRYPT="/usr/local/bin/certbot"
@@ -207,7 +207,6 @@ function le-webserver-status {
         ;;
         apache|APACHE)
 	    if [ -e $APACHECTL ]; then
-		$APACHESTATUS
 		if  LOG=$($APACHESTATUS 2>&1); then
 		    MESSAGE=" $WEBSERVER status: $LOG"; log-ok
 		else
