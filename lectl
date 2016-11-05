@@ -1,14 +1,14 @@
 #!/usr/local/bin/bash
 #set -x
 
-VERSION="0.2.4-CURRENT"
-#VERSION="0.2.4"
+#VERSION="0.3.0-CURRENT"
+VERSION="0.3.0"
 
 #
 LETSENCRYPT="/usr/local/bin/certbot"
 LEROOT="/usr/local/etc/letsencrypt"
 OPENSSL="/usr/bin/openssl"
-X509OPTS="x509 -dates -email -issuer -subject -serial -noout -in"
+X509ITEMS="x509 -dates -email -issuer -subject -serial -noout -in"
 
 #
 #WEBSERVER="NONE"
@@ -129,7 +129,7 @@ function print-config {
     printf "[DBG] lectl: RAW: $RAW\n"
     printf "[DBG] lectl: DRYRUN: $DRYRUN\n"
     printf "[DBG] lectl: DAYS: $DAYS\n"
-    printf "[DBG] lectl: DOMAINS:\n $DOMAINS\n"
+    printf "[DBG] lectl: DOMAINS: $DOMAINS\n"
     printf "[DBG] lectl: <<< CONFIG\n"
 }
 
@@ -166,7 +166,7 @@ function le-cert-info-all {
 }
 
 function le-cert-info {
-    if  LOG=$(LC_ALL=C $OPENSSL $X509OPTS $LEROOT/live/$DOMAIN/fullchain.pem 2>&1); then
+    if  LOG=$(LC_ALL=C $OPENSSL $X509ITEMS $LEROOT/live/$DOMAIN/fullchain.pem 2>&1); then
 	if [[ $RAW = 1 ]]; then
 	    printf "$LOG\n"
 	else

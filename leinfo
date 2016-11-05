@@ -1,0 +1,220 @@
+#!/usr/local/bin/bash
+#set -x
+
+#VERSION="0.3.0-CURRENT"
+VERSION="0.3.0"
+#
+LETSENCRYPT="/usr/local/bin/certbot"
+LEROOT="/usr/local/etc/letsencrypt"
+OPENSSL="/usr/bin/openssl"
+X509ITEMS="x509 -dates -email -issuer -subject -serial -noout -in"
+X509FINGERPRINT="x509 -fingerprint -noout -in"
+#
+LOGTOFILE="0"
+LOGFILE="/var/log/le-utils"
+#
+FINGERPRINTFILE="$LEROOT/FINGERPRINT"
+
+[ -f /etc/le-utils ] && . /etc/le-utils
+[ -f /usr/local/etc/le-utils ] && . /usr/local/etc/le-utils
+[ -f ~/.le-utils ] && . ~/.le-utils
+[ -f ./.le-utils ] && . ./.le-utils
+
+USAGE="
+leinfo [-V|--version] [-h|--help] [-s|--silent] [-d|--debug]
+       [-l|--list] [-r|--raw] [-f| --fingerprint]
+       [-e|--expire] [-D=NoOfDays|--Days=NoOfDays]
+       [-a|--all|<CN>]
+       -- Letsencrypt certificates management
+
+where:
+ -V --version .......... print version end exit
+ -h --help ............. show this help and exit
+ -l --list ............. list domains (CN) and exit
+ -f --fingerprint ...... print fingerprint of certificate and exit
+ -g --fingerprint-file . print fingerprint to file $FINGERPRINTFILE and exit
+ -r --raw .............. print raw output of openssl x509 command
+ -e --expire ........... report number of days till certificate expires
+ -D --Days=NoOfDays .... with -e list certificates that will expire in period of NoOfDays
+ -s --silent ........... print errors only; with -e only report number of days
+ -d --debug ............ print debug output
+ -a --all .............. check all domains
+ <CN> .................. check domain (CN)
+
+Examples:
+Print information about all domains
+# leinfo -a
+Print raw output of openssl x509 command for example.com
+# leinfo -r example.com
+Print fingerprints of all certificates
+# leinfo -f -a
+List all certificates that will expire in less then 30 days
+# leinfo -e --Days=30 -a"
+
+
+EXPECTED_ARGS=1
+if [ $# -lt $EXPECTED_ARGS ]; then
+    echo "$USAGE"
+    exit
+fi
+
+function log-ok {
+    (($VERBOSE)) && printf "[OK]  leinfo: $MESSAGE\n"
+    (($LOGTOFILE)) && printf "`date "+%F %T"` [OK]  leinfo: $MESSAGE\n" >> $LOGFILE
+}
+function log-dbg {
+    if [ $DEBUG -eq 1 ]; then
+	printf "[DBG] leinfo: $MESSAGE\n"
+	(($LOGTOFILE)) && printf "`date "+%F %T"` [DBG] leinfo: $MESSAGE\n" >> $LOGFILE
+    fi
+}
+function log-err {
+    printf "[ERR] leinfo: $MESSAGE\n"
+    (($LOGTOFILE)) && printf "`date "+%F %T"` [ERR] leinfo: $MESSAGE\n" >> $LOGFILE
+}
+
+function print-config {
+    printf "[DBG] leinfo: >>> CONFIG\n"
+    printf "[DBG] leinfo: LETSENCRYPT: $LETSENCRYPT\n"
+    printf "[DBG] leinfo: LEROOT: $LEROOT\n"
+    printf "[DBG] leinfo: OPENSSL: $OPENSSL\n"
+    printf "[DBG] leinfo: X509OPTS: $X509OPTS\n"
+    printf "[DBG] leinfo: LOGFILE: $LOGFILE\n"
+    printf "[DBG] leinfo: ALLDOMAINS: $ALLDOMAINS\n"
+    printf "[DBG] leinfo: VERBOSE: $VERBOSE\n"
+    printf "[DBG] leinfo: DEBUG: $DEBUG\n"
+    printf "[DBG] leinfo: EXPIRE: $EXPIRE\n"
+    printf "[DBG] leinfo: RAW: $RAW\n"
+    printf "[DBG] leinfo: FINGERPRINT: $FINGERPRINT\n"
+    printf "[DBG] leinfo: FINGERPRINTTOFILE: $FINGERPRINTTOFILE\n"
+    printf "[DBG] leinfo: FINGERPRINTFILE: $FINGERPRINTFILE\n"
+    printf "[DBG] leinfo: DAYS: $DAYS\n"
+    printf "[DBG] leinfo: DOMAINS: $DOMAINS\n"
+    printf "[DBG] leinfo: <<< CONFIG\n"
+}
+
+function bsd-date {
+    BSDDATE=$(LC_ALL=C date -j -f "%b %d %T %Y %Z" "$DATE")
+    BSDSEC=$(LC_ALL=C date -j -f "%b %d %T %Y %Z" "$DATE" "+%s")
+    EXPSEC=$(($BSDSEC - $(LC_ALL=C date +%s)))
+    EXPDAYS=$(($EXPSEC / 86400))
+}
+
+function le-cert-info-all {
+    for DOMAIN in $DOMAINS; do
+	le-cert-info
+    done
+}
+
+function le-cert-info {
+    (($DEBUG)) && print-config
+    if [[ $FINGERPRINTTOFILE = 1 ]]; then
+	printf "$DOMAIN\n" > $FINGERPRINTFILE
+	if LOG=$(LC_ALL=C $OPENSSL $X509FINGERPRINT $LEROOT/live/$DOMAIN/fullchain.pem -sha256 2>&1); then
+	    printf "$LOG\n"  >> $FINGERPRINTFILE
+	    MESSAGE=" SHA256 fingerprint of $DOMAIN recorded in $FINGERPRINTFILE"; log-ok
+	else
+	    MESSAGE=" $LOG"; log-err
+	fi
+	if LOG=$(LC_ALL=C $OPENSSL $X509FINGERPRINT $LEROOT/live/$DOMAIN/fullchain.pem -sha1 2>&1); then
+	    printf "$LOG\n"  >> $FINGERPRINTFILE
+	    MESSAGE=" SHA1 fingerprint of $DOMAIN recorded in $FINGERPRINTFILE"; log-ok
+	else
+	    MESSAGE=" $LOG"; log-err
+	fi
+    elif [[ $FINGERPRINT = 1 ]]; then
+	printf "$DOMAIN\n"
+	if LOG=$(LC_ALL=C $OPENSSL $X509FINGERPRINT $LEROOT/live/$DOMAIN/fullchain.pem -sha256 2>&1); then
+	    printf "$LOG\n"
+	else
+	    MESSAGE=" $LOG"; log-err
+	fi
+	if LOG=$(LC_ALL=C $OPENSSL $X509FINGERPRINT $LEROOT/live/$DOMAIN/fullchain.pem -sha1 2>&1); then
+	    printf "$LOG\n"
+	else
+	    MESSAGE=" $LOG"; log-err
+	fi
+    else
+	if LOG=$(LC_ALL=C $OPENSSL $X509ITEMS $LEROOT/live/$DOMAIN/fullchain.pem 2>&1); then
+	    if [[ $RAW = 1 ]]; then
+		printf "$LOG\n"
+	    else
+		NOTBEFORE=$(printf "${LOG}" | grep notBefore= | cut -d= -f 2)
+		NOTAFTER=$(printf "${LOG}" | grep notAfter= | cut -d= -f 2)
+		ISSUER=$(printf %s "${LOG}" | grep issuer= | cut -d= -f 2-99)
+		SUBJECT=$(printf "${LOG}" | grep subject= | cut -d= -f 2-99)
+		SERIAL=$(printf "${LOG}" | grep serial= | cut -d= -f 2)
+		if [[ $EXPIRE = 1 ]]; then
+		    DATE=$NOTAFTER; bsd-date
+		    [ $EXPDAYS -lt $DAYS ] && printf "%d" "$EXPDAYS"
+		    [ $EXPDAYS -lt $DAYS ] && (($VERBOSE)) && printf " days to the expiration of $DOMAIN\n"
+		else
+		    printf "[$NOTBEFORE] [$NOTAFTER] [$ISSUER] [$SUBJECT]\n"
+		fi
+	    fi
+	else
+	    MESSAGE=" $LOG"; log-err
+	fi
+    fi
+}
+
+
+VERBOSE="1"
+DEBUG="0"
+EXPIRE="0"
+RAW="0"
+FINGERPRINT="0"
+FINGERPRINTTOFILE="0"
+DAYS="999999"
+DOMAINS=$(cd $LEROOT/live; ls -1)
+
+for i in "$@"; do
+    case $i in
+        -V|--version)
+	    printf "$VERSION\n"
+            exit
+            ;;
+        -h|--help)
+            printf "$USAGE\n"
+            exit
+            ;;
+        -l|--list)
+            printf "$DOMAINS\n"
+            exit
+            ;;
+	-e|--expire)
+	    EXPIRE="1"
+	    ;;
+	-D=*|--Days=*)
+	    DAYS="${i#*=}"
+	    ;;
+        -r|--raw)
+            RAW="1"
+            ;;
+        -f|--fingerprint)
+            FINGERPRINT="1"
+            ;;
+	-g|--fingerprint-file)
+            FINGERPRINTTOFILE="1"
+            ;;
+        -s|--silent)
+            VERBOSE="0"
+            ;;
+        -d|--debug)
+            DEBUG="1"
+            ;;
+        -a|--all)
+	    le-cert-info-all
+	    ;;
+        *)
+            if [[ $DOMAINS =~ $i ]]; then
+                DOMAIN=$i
+		le-cert-info
+            else
+                MESSAGE=" Unknown domain $i"; log-err
+            fi
+            ;;
+    esac
+done
+
+exit 0
