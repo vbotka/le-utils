@@ -88,6 +88,9 @@ The Technical Advisory Board chose
 * with an expectation that people will want to auto-renew at the
   60-day mark."
 
+# ERR  Description
+# 101  Renewal of single certificate not available.
+
 EXPECTED_ARGS=1
 if [ $# -lt $EXPECTED_ARGS ]; then
     echo "$USAGE"
@@ -189,7 +192,7 @@ function le-cert-renew {
     if [ $ALLDOMAINS -eq 0 ]; then
 	# $LETSENCRYPT renew $DRYRUN -d $DOMAIN
 	MESSAGE=" Renewal of single certificate not available"; log-err
-	exit
+	exit 101
     else
 	if LOG=$($LETSENCRYPT renew $DRYRUN  2>&1); then
 	    [[ ! -z $LOG ]] && (MESSAGE=" $LETSENCRYPT log: \n$LOG"; log-ok)
