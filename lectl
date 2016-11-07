@@ -1,8 +1,8 @@
 #!/usr/local/bin/bash
 #set -x
 
-#VERSION="0.3.0-CURRENT"
-VERSION="0.3.0"
+#VERSION="0.3.1-CURRENT"
+VERSION="0.3.1"
 
 #
 LETSENCRYPT="/usr/local/bin/certbot"
@@ -90,6 +90,8 @@ The Technical Advisory Board chose
 
 # ERR  Description
 # 101  Renewal of single certificate not available.
+# 102  Unknown webserver
+# 103  Webserver failed to restart
 
 EXPECTED_ARGS=1
 if [ $# -lt $EXPECTED_ARGS ]; then
@@ -205,6 +207,7 @@ function le-cert-renew {
 }
 
 function le-webserver-status {
+    RESTART=0
     case $WEBSERVER in
         none|NONE)
         ;;
@@ -212,6 +215,10 @@ function le-webserver-status {
 	    if [ -e $APACHECTL ]; then
 		if  LOG=$($APACHESTATUS 2>&1); then
 		    MESSAGE=" $WEBSERVER status: $LOG"; log-ok
+		    if ( echo $LOG | grep "is running"); then
+			RESTART=1
+			MESSAGE=" RESTART=$RESTART"; log-dbg
+		    fi
 		else
 		    MESSAGE=" le-webserver-status: Status of $WEBSERVER failed"; log-err
 		    MESSAGE=" le-webserver-status: $LOG"; log-err
@@ -222,7 +229,7 @@ function le-webserver-status {
             ;;
         *)
 	    MESSAGE=" le-webserver-status: Unknown webserver: $WEBSERVER"; log-err
-            exit 99
+            exit 102
             ;;
     esac
 }
@@ -231,14 +238,16 @@ function le-webserver-stop {
     case $WEBSERVER in
         none|NONE)
 	    MESSAGE=" Webserver: $WEBSERVER"; log-ok
-        ;;
+            ;;
         apache|APACHE)
 	    if [ -e $APACHECTL ]; then
-		if  LOG=$($APACHESTOP 2>&1); then
-		    MESSAGE=" $WEBSERVER stopped"; log-ok
-		else
-		    MESSAGE=" le-webserver-stop: Stop of $WEBSERVER failed"; log-err
-		    MESSAGE=" le-webserver-stop: $LOG"; log-err
+		if [ $RESTART -eq "1" ]; then
+		    if  LOG=$($APACHESTOP 2>&1); then
+			MESSAGE=" $WEBSERVER stopped"; log-ok
+		    else
+			MESSAGE=" le-webserver-stop: Stop of $WEBSERVER failed"; log-err
+			MESSAGE=" le-webserver-stop: $LOG"; log-err
+		    fi
 		fi
 	    else
 		MESSAGE=" le-webserver-stop: Can't find $APACHECTL. Set WEBSERVER to NONE, if no webserver is installed."; log-err
@@ -246,7 +255,7 @@ function le-webserver-stop {
             ;;
         *)
 	    MESSAGE=" le-webserver-stop: Unknown webserver: $WEBSERVER"; log-err
-	    exit 99
+	    exit 102
             ;;
     esac
 }
@@ -257,12 +266,15 @@ function le-webserver-restart {
         ;;
         apache|APACHE)
     	    if [ -e $APACHECTL ]; then
-		if  LOG=$($APACHERESTART 2>&1); then
-		    MESSAGE=" $WEBSERVER restarted"; log-ok
-		else
-		    MESSAGE=" le-webserver-restart: Restart of $WEBSERVER failed"; log-err
-		    MESSAGE=" le-webserver-restart: $LOG"; log-err
-		    exit 99
+		if [ $RESTART -eq "1" ]; then
+
+		    if  LOG=$($APACHERESTART 2>&1); then
+			MESSAGE=" $WEBSERVER restarted"; log-ok
+		    else
+			MESSAGE=" le-webserver-restart: Restart of $WEBSERVER failed"; log-err
+			MESSAGE=" le-webserver-restart: $LOG"; log-err
+			exit 103
+		    fi
 		fi
 	    else
 		MESSAGE=" le-webserver-restart: Can't find $APACHECTL. Set WEBSERVER to NONE, if no webserver is installed."; log-err
@@ -270,7 +282,7 @@ function le-webserver-restart {
             ;;
         *)
 	    MESSAGE=" le-webserver-restart: Unknown webserver: $WEBSERVER"; log-err
-            exit 99
+            exit 102
             ;;
     esac
 }
