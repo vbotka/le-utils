@@ -142,7 +142,7 @@ function le-main {
         2)  # renewal
 	    le-webserver-stop
             le-cert-renew
-	    # TODO: do not start apache if it had not run before stop was issued.
+	    # TODO: do not start apache if it did not run before
 	    le-webserver-restart
             ;;
         *)

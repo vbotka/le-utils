@@ -109,7 +109,7 @@ function le-cert-info-all {
 function le-cert-info {
     (($DEBUG)) && print-config
     if [[ $FINGERPRINTTOFILE = 1 ]]; then
-	printf "$DOMAIN\n" > $FINGERPRINTFILE
+	printf "$DOMAIN\n" >> $FINGERPRINTFILE
 	if LOG=$(LC_ALL=C $OPENSSL $X509FINGERPRINT $LEROOT/live/$DOMAIN/fullchain.pem -sha256 2>&1); then
 	    printf "$LOG\n"  >> $FINGERPRINTFILE
 	    MESSAGE=" SHA256 fingerprint of $DOMAIN recorded in $FINGERPRINTFILE"; log-ok
@@ -196,6 +196,7 @@ for i in "$@"; do
             ;;
 	-g|--fingerprint-file)
             FINGERPRINTTOFILE="1"
+	    printf "$(date)\n" > $FINGERPRINTFILE
             ;;
         -s|--silent)
             VERBOSE="0"
