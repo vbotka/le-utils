@@ -1,8 +1,8 @@
 #!/usr/local/bin/bash
 #set -x
 
-#VERSION="0.3.1-CURRENT"
-VERSION="0.3.1"
+VERSION="0.3.1-CURRENT"
+#VERSION="0.3.1"
 
 #
 LETSENCRYPT="/usr/local/bin/certbot"
@@ -142,13 +142,13 @@ function le-main {
             (($ALLDOMAINS)) && le-cert-info-all || le-cert-info
             ;;
         2)  # renewal
+	    le-webserver-status
 	    le-webserver-stop
             le-cert-renew
-	    # TODO: do not start apache if it did not run before
 	    le-webserver-restart
             ;;
         *)
-	    MESSAGE=" Unknown mode: $MODE"; log-err
+	    MESSAGE=" line: $LINENO; Unknown mode: $MODE"; log-err
             exit
             ;;
     esac
@@ -186,21 +186,21 @@ function le-cert-info {
 	    fi
 	fi
     else
-	MESSAGE=" $LOG"; log-err
+	MESSAGE=" line: $LINENO; $LOG"; log-err
     fi
 }
 
 function le-cert-renew {
-    if [ $ALLDOMAINS -eq 0 ]; then
+    if [[ $ALLDOMAINS -eq 0 ]]; then
 	# $LETSENCRYPT renew $DRYRUN -d $DOMAIN
-	MESSAGE=" Renewal of single certificate not available"; log-err
+	MESSAGE=" line: $LINENO; Renewal of single certificate not available."; log-err
 	exit 101
     else
 	if LOG=$($LETSENCRYPT renew $DRYRUN  2>&1); then
 	    [[ ! -z $LOG ]] && (MESSAGE=" $LETSENCRYPT log: \n$LOG"; log-ok)
 	    MESSAGE=" $LETSENCRYPT renew $DRYRUN finished"; log-ok
 	else
-	    MESSAGE=" $LETSENCRYPT renew $DRYRUN error: $?"; log-err
+	    MESSAGE=" line: $LINENO; $LETSENCRYPT renew $DRYRUN error: $?"; log-err
 	    MESSAGE=" $LETSENCRYPT renew $DRYRUN log: \n$LOG"; log-err
 	fi
     fi
@@ -213,22 +213,22 @@ function le-webserver-status {
         ;;
         apache|APACHE)
 	    if [ -e $APACHECTL ]; then
-		if  LOG=$($APACHESTATUS 2>&1); then
+		if LOG=$($APACHESTATUS 2>&1); then
 		    MESSAGE=" $WEBSERVER status: $LOG"; log-ok
 		    if ( echo $LOG | grep "is running"); then
 			RESTART=1
 			MESSAGE=" RESTART=$RESTART"; log-dbg
 		    fi
 		else
-		    MESSAGE=" le-webserver-status: Status of $WEBSERVER failed"; log-err
+		    MESSAGE=" le-webserver-status; line: $LINENO; Status of $WEBSERVER failed"; log-err
 		    MESSAGE=" le-webserver-status: $LOG"; log-err
 		fi
 	    else
-		MESSAGE=" le-webserver-status: Can't find $APACHECTL. Set WEBSERVER to NONE, if no webserver is installed."; log-err
+		MESSAGE=" le-webserver-status; line: $LINENO; Can't find $APACHECTL. Set WEBSERVER to NONE, if no webserver is installed."; log-err
 	    fi
             ;;
         *)
-	    MESSAGE=" le-webserver-status: Unknown webserver: $WEBSERVER"; log-err
+	    MESSAGE=" le-webserver-status; line: $LINENO; Unknown webserver: $WEBSERVER"; log-err
             exit 102
             ;;
     esac
@@ -241,20 +241,20 @@ function le-webserver-stop {
             ;;
         apache|APACHE)
 	    if [ -e $APACHECTL ]; then
-		if [ $RESTART -eq "1" ]; then
+		if [[ $RESTART -eq 1 ]]; then
 		    if  LOG=$($APACHESTOP 2>&1); then
 			MESSAGE=" $WEBSERVER stopped"; log-ok
 		    else
-			MESSAGE=" le-webserver-stop: Stop of $WEBSERVER failed"; log-err
+			MESSAGE=" le-webserver-stop; line: $LINENO; Stop of $WEBSERVER failed"; log-err
 			MESSAGE=" le-webserver-stop: $LOG"; log-err
 		    fi
 		fi
 	    else
-		MESSAGE=" le-webserver-stop: Can't find $APACHECTL. Set WEBSERVER to NONE, if no webserver is installed."; log-err
+		MESSAGE=" le-webserver-stop; line: $LINENO; Can't find $APACHECTL. Set WEBSERVER to NONE, if no webserver is installed."; log-err
 	    fi
             ;;
         *)
-	    MESSAGE=" le-webserver-stop: Unknown webserver: $WEBSERVER"; log-err
+	    MESSAGE=" le-webserver-stop; line: $LINENO; Unknown webserver: $WEBSERVER"; log-err
 	    exit 102
             ;;
     esac
@@ -266,22 +266,22 @@ function le-webserver-restart {
         ;;
         apache|APACHE)
     	    if [ -e $APACHECTL ]; then
-		if [ $RESTART -eq "1" ]; then
+		if [[ $RESTART -eq 1 ]]; then
 
 		    if  LOG=$($APACHERESTART 2>&1); then
 			MESSAGE=" $WEBSERVER restarted"; log-ok
 		    else
-			MESSAGE=" le-webserver-restart: Restart of $WEBSERVER failed"; log-err
+			MESSAGE=" le-webserver-restart; line: $LINENO; Restart of $WEBSERVER failed"; log-err
 			MESSAGE=" le-webserver-restart: $LOG"; log-err
 			exit 103
 		    fi
 		fi
 	    else
-		MESSAGE=" le-webserver-restart: Can't find $APACHECTL. Set WEBSERVER to NONE, if no webserver is installed."; log-err
+		MESSAGE=" le-webserver-restart; line: $LINENO; Can't find $APACHECTL. Set WEBSERVER to NONE, if no webserver is installed."; log-err
 	    fi
             ;;
         *)
-	    MESSAGE=" le-webserver-restart: Unknown webserver: $WEBSERVER"; log-err
+	    MESSAGE=" le-webserver-restart; line: $LINENO; Unknown webserver: $WEBSERVER"; log-err
             exit 102
             ;;
     esac
