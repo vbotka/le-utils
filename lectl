@@ -53,18 +53,21 @@ where:
  -d --debug ......... print debug output
  -c --renew ......... renew cerficates (Note 2,3)
  -n --dryrun ........ with -c dry run only
- -a --all ........... check all domains (CN)
- <CN> ............... check domain (CN)(Note 1)
+ -a --all ........... check all domains
+ <CN> ............... check domain (Note 1)
 
 Examples:
-Print information about all domains
+Print information about all certificates.
 # lectl -a
 Print raw output of openssl x509 command for example.com
 # lectl -r example.com
-List all certificates that will expire in less then 30 days
+List all certificates that will expire in less then 30 days.
 # lectl -e --Days=30 -a
-Dry run renewal of all certificates (run daily in cron for feedback)
+Dry run renewal of all certificates (run daily in cron for feedback).
 # lectl -n -c -a
+Renew all certificates if any of them expires in less then 30 days
+(renewal of single certificate is not available). (Note 4)
+# lectl -D=30 -c -a
 
 Notes:
 1) Renewal of single ceritificate
@@ -86,7 +89,9 @@ https://community.letsencrypt.org/t/pros-and-cons-of-90-day-certificate-lifetime
 The Technical Advisory Board chose
 * 90-day certificate lifetime to start with
 * with an expectation that people will want to auto-renew at the
-  60-day mark."
+  60-day mark.
+4) Certobot will not renew a certificate more then 30 days before
+expiration. Message: Cert not yet due for renewal."
 
 # ERR  Description
 # 101  Renewal of single certificate not available.
@@ -142,10 +147,7 @@ function le-main {
             (($ALLDOMAINS)) && le-cert-info-all || le-cert-info
             ;;
         2)  # renewal
-	    le-webserver-status
-	    le-webserver-stop
             le-cert-renew
-	    le-webserver-restart
             ;;
         *)
 	    MESSAGE=" line: $LINENO; Unknown mode: $MODE"; log-err
@@ -179,30 +181,45 @@ function le-cert-info {
 	    SERIAL=$(printf "${LOG}" | grep serial= | cut -d= -f 2)
 	    if [[ $EXPIRE = 1 ]]; then
 		DATE=$NOTAFTER; bsd-date
-		[ $EXPDAYS -lt $DAYS ] && printf "%d" "$EXPDAYS"
-		[ $EXPDAYS -lt $DAYS ] && (($VERBOSE)) && printf " days to the expiration of $DOMAIN\n"
+		MESSAGE=" le-cert-info: $DOMAIN NOTAFTER=$NOTAFTER EXPDAYS=$EXPDAYS"; log-dbg
+		[[ $EXPDAYS -lt $DAYS ]] && printf "%d" "$EXPDAYS"
+		[[ $EXPDAYS -lt $DAYS ]] && (($VERBOSE)) && printf " days to the expiration of $DOMAIN\n"
 	    else
 		printf "[$NOTBEFORE] [$NOTAFTER] [$ISSUER] [$SUBJECT]\n"
 	    fi
 	fi
     else
-	MESSAGE=" line: $LINENO; $LOG"; log-err
+	MESSAGE=" le-cert-info: line: $LINENO; $LOG"; log-err
     fi
 }
 
 function le-cert-renew {
     if [[ $ALLDOMAINS -eq 0 ]]; then
 	# $LETSENCRYPT renew $DRYRUN -d $DOMAIN
-	MESSAGE=" line: $LINENO; Renewal of single certificate not available."; log-err
+	MESSAGE=" le-cert-info: line: $LINENO; Renewal of single certificate not available."; log-err
 	exit 101
     else
-	if LOG=$($LETSENCRYPT renew $DRYRUN  2>&1); then
-	    [[ ! -z $LOG ]] && (MESSAGE=" $LETSENCRYPT log: \n$LOG"; log-ok)
-	    MESSAGE=" $LETSENCRYPT renew $DRYRUN finished"; log-ok
-	else
-	    MESSAGE=" line: $LINENO; $LETSENCRYPT renew $DRYRUN error: $?"; log-err
-	    MESSAGE=" $LETSENCRYPT renew $DRYRUN log: \n$LOG"; log-err
-	fi
+	for DOMAIN in $DOMAINS; do
+	    EXPIRE="1"
+	    le-cert-info
+	    MESSAGE=" le-cert-renew: le-cert-info: $DOMAIN:\n$LOG"; log-dbg
+	    if [[ $EXPDAYS -lt $DAYS ]]; then
+		MESSAGE=" Due for renewal. $DOMAIN expires in $EXPDAYS days."; log-ok
+		le-webserver-status
+		le-webserver-stop
+		if LOG=$($LETSENCRYPT renew $DRYRUN  2>&1); then
+		    [[ ! -z $LOG ]] && (MESSAGE=" $LETSENCRYPT log: \n$LOG"; log-ok)
+		    MESSAGE=" $LETSENCRYPT renew $DRYRUN finished."; log-ok
+		else
+		    MESSAGE=" le-cert-renew: line: $LINENO; $LETSENCRYPT renew $DRYRUN error: $?"; log-err
+		    MESSAGE=" $LETSENCRYPT renew $DRYRUN log: \n$LOG"; log-err
+		fi
+		le-webserver-restart
+		break
+	    else
+		MESSAGE=" No renewal. $DOMAIN expires in $EXPDAYS days."; log-ok
+	    fi
+	done
     fi
 }
 
@@ -215,7 +232,7 @@ function le-webserver-status {
 	    if [ -e $APACHECTL ]; then
 		if LOG=$($APACHESTATUS 2>&1); then
 		    MESSAGE=" $WEBSERVER status: $LOG"; log-ok
-		    if ( echo $LOG | grep "is running"); then
+		    if LOG=$(echo $LOG | grep "is running"); then
 			RESTART=1
 			MESSAGE=" RESTART=$RESTART"; log-dbg
 		    fi
@@ -294,7 +311,7 @@ DEBUG="0"
 EXPIRE="0"
 RAW="0"
 DRYRUN=""
-DAYS="999999"
+DAYS=999999
 DOMAINS=$(cd $LEROOT/live; ls -1)
 for i in "$@"; do
     case $i in
@@ -314,7 +331,7 @@ for i in "$@"; do
 	    EXPIRE="1"
 	    ;;
 	-D=*|--Days=*)
-	    DAYS="${i#*=}"
+	    DAYS=${i#*=}
 	    ;;
         -r|--raw)
             RAW="1"

@@ -165,7 +165,7 @@ EXPIRE="0"
 RAW="0"
 FINGERPRINT="0"
 FINGERPRINTTOFILE="0"
-DAYS="999999"
+DAYS=999999
 DOMAINS=$(cd $LEROOT/live; ls -1)
 
 for i in "$@"; do
@@ -186,7 +186,7 @@ for i in "$@"; do
 	    EXPIRE="1"
 	    ;;
 	-D=*|--Days=*)
-	    DAYS="${i#*=}"
+	    DAYS=${i#*=}
 	    ;;
         -r|--raw)
             RAW="1"
