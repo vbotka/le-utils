@@ -1,8 +1,8 @@
 #!/usr/local/bin/bash
 #set -x
 
-VERSION="0.3.2-CURRENT"
-#VERSION="0.3.2"
+VERSION="0.3.3-CURRENT"
+#VERSION="0.3.4"
 
 #
 LETSENCRYPT="/usr/local/bin/certbot"
