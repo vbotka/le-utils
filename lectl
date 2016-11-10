@@ -1,15 +1,20 @@
 #!/usr/local/bin/bash
 #set -x
 
-VERSION="0.3.3-CURRENT"
-#VERSION="0.3.4"
+#VERSION="0.3.4-CURRENT"
+VERSION="0.3.4"
 
 #
 LETSENCRYPT="/usr/local/bin/certbot"
 LEROOT="/usr/local/etc/letsencrypt"
+LEOWNER="root"
+LEGROUP="wheel"
+LEPRIVDIRS="accounts keys live"
+LEPRIVDIRMOD="0700"
+LEPRIVKEYMOD="0600"
+#
 OPENSSL="/usr/bin/openssl"
 X509ITEMS="x509 -dates -email -issuer -subject -serial -noout -in"
-
 #
 #WEBSERVER="NONE"
 WEBSERVER="APACHE"
@@ -21,11 +26,9 @@ APACHERESTART="$APACHECTL -k graceful"
 #APACHESTATUS="/usr/local/etc/rc.d/$APACHE status"
 #APACHESTOP="/usr/local/etc/rc.d/$APACHE gracefulstop"
 #APACHESTART="/usr/local/etc/rc.d/$APACHE graceful"
-
 #
 MAILSERVER="NONE"
 #MAILSERVER="postfix"
-
 #
 LOGTOFILE="1"
 LOGFILE="/var/log/le-utils"
@@ -38,6 +41,7 @@ LOGFILE="/var/log/le-utils"
 USAGE="
 lectl [-V|--version] [-h|--help] [-s|--silent] [-d|--debug]
       [-l|--list] [-r|--raw]
+      [-p|--permissions]
       [-e|--expire] [-D=NoOfDays|--Days=NoOfDays]
       [-c|--renew] [-n|--dryrun] [-a|--all|<CN>]
       -- Letsencrypt certificates management
@@ -47,6 +51,7 @@ where:
  -h --help .......... show this help and exit
  -l --list .......... list domains and exit
  -r --raw ........... print raw output of openssl x509 command
+ -p --permissions ... set permissions (Note 5)
  -e --expire ........ show number of days till certificate expires
  -D --Days=NoOfDays . with -e list certificates that will expire in period of NoOfDays
  -s --silent ........ print errors only; with -e only report number of days to expire
@@ -68,6 +73,8 @@ Dry run renewal of all certificates (run daily in cron for feedback).
 Renew all certificates if any of them expires in less then 30 days
 (renewal of single certificate is not available). (Note 4)
 # lectl -D=30 -c -a
+Set permissions of private keys to $PRIVKEYMOD
+# lectl -p
 
 Notes:
 1) Renewal of single ceritificate
@@ -91,12 +98,16 @@ The Technical Advisory Board chose
 * with an expectation that people will want to auto-renew at the
   60-day mark.
 4) Certobot will not renew a certificate more then 30 days before
-expiration. Message: Cert not yet due for renewal."
+expiration. Message: Cert not yet due for renewal.
+5) Set permissions of all private keys to $LEPRIVKEYMOD and set
+permissions of: $LEPRIVDIRS in $LEROOT to $LEPRIVDIRMOD ."
 
 # ERR  Description
 # 101  Renewal of single certificate not available.
 # 102  Unknown webserver
 # 103  Webserver failed to restart
+# 104  Set Permissions of private keys failed
+# 105  Set Permissions of private directory failed
 
 EXPECTED_ARGS=1
 if [ $# -lt $EXPECTED_ARGS ]; then
@@ -137,6 +148,11 @@ function print-config {
     printf "[DBG] lectl: DRYRUN: $DRYRUN\n"
     printf "[DBG] lectl: DAYS: $DAYS\n"
     printf "[DBG] lectl: DOMAINS: $DOMAINS\n"
+    printf "[DBG] lectl: LEOWNER: $LEOWNER\n"
+    printf "[DBG] lectl: LEGROUP: $LEGROUP\n"
+    printf "[DBG] lectl: LEPRIVDIRS: $LEPRIVDIRS\n"
+    printf "[DBG] lectl: LEPRIVDIRMOD: $LEPRIVDIRMOD\n"
+    printf "[DBG] lectl: LEPRIVKEYMOD: $LEPRIVKEYMOD\n"
     printf "[DBG] lectl: <<< CONFIG\n"
 }
 
@@ -304,6 +320,26 @@ function le-webserver-restart {
     esac
 }
 
+function le-cert-permissions {
+    for i in $LEPRIVDIRS; do
+        if  LOG=$(chmod $LEPRIVDIRMOD $LEROOT/$i); then
+	    MESSAGE=" Permissions of $LEROOT/$i set to $LEPRIVDIRMOD"; log-ok
+	else
+	    MESSAGE=" le-cert-permissions; line: $LINENO; Set permissions of $LEROOT/$i failed"; log-err
+	    MESSAGE=" le-cert-permissions: $LOG"; log-err
+	    exit 105
+	fi
+    done
+    if  LOG=$(find $LEROOT -name "privkey*" -exec chmod $LEPRIVKEYMOD {} \;); then
+	MESSAGE=" Permissions of private keys set to $LEPRIVKEYMOD"; log-ok
+    else
+	MESSAGE=" le-cert-permissions; line: $LINENO; Set Permissions of private keys failed"; log-err
+	MESSAGE=" le-cert-permissions: $LOG"; log-err
+	exit 104
+    fi
+}
+
+
 MODE="1" # 1-info 2-renew
 ALLDOMAINS="0"
 VERBOSE="1"
@@ -347,6 +383,9 @@ for i in "$@"; do
             ;;
         -n|--dryrun)
             DRYRUN=" --dry-run"
+            ;;
+        -p|--permissions)
+	    le-cert-permissions
             ;;
         -a|--all)
 	    ALLDOMAINS="1"
