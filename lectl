@@ -225,7 +225,7 @@ function le-cert-renew {
 		le-webserver-stop
 		if LOG=$($LETSENCRYPT renew $DRYRUN  2>&1); then
 		    [[ ! -z $LOG ]] && (MESSAGE=" $LETSENCRYPT log: \n$LOG"; log-ok)
-		    MESSAGE=" $LETSENCRYPT renew $DRYRUN finished."; log-ok
+		    MESSAGE=" $LETSENCRYPT renew $DRYRUN finished. Check the permissions, or run: lectl -p"; log-ok
 		else
 		    MESSAGE=" le-cert-renew: line: $LINENO; $LETSENCRYPT renew $DRYRUN error: $?"; log-err
 		    MESSAGE=" $LETSENCRYPT renew $DRYRUN log: \n$LOG"; log-err
