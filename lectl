@@ -1,8 +1,8 @@
 #!/usr/local/bin/bash
 #set -x
 
-#VERSION="0.3.4-CURRENT"
-VERSION="0.3.4"
+VERSION="0.3.4-CURRENT"
+#VERSION="0.3.4"
 
 #
 LETSENCRYPT="/usr/local/bin/certbot"
@@ -110,7 +110,7 @@ permissions of: $LEPRIVDIRS in $LEROOT to $LEPRIVDIRMOD ."
 # 105  Set Permissions of private directory failed
 
 EXPECTED_ARGS=1
-if [ $# -lt $EXPECTED_ARGS ]; then
+if [[ $# -lt $EXPECTED_ARGS ]]; then
     echo "$USAGE"
     exit
 fi
@@ -120,7 +120,7 @@ function log-ok {
     (($LOGTOFILE)) && printf "`date "+%F %T"` [OK]  lectl: $MESSAGE\n" >> $LOGFILE
 }
 function log-dbg {
-    if [ $DEBUG -eq 1 ]; then
+    if [[ $DEBUG -eq 1 ]]; then
 	printf "[DBG] lectl: $MESSAGE\n"
 	(($LOGTOFILE)) && printf "`date "+%F %T"` [DBG] lectl: $MESSAGE\n" >> $LOGFILE
     fi
@@ -185,27 +185,31 @@ function le-cert-info-all {
     done
 }
 
-function le-cert-info {
+function le-cert-data {
     if  LOG=$(LC_ALL=C $OPENSSL $X509ITEMS $LEROOT/live/$DOMAIN/fullchain.pem 2>&1); then
-	if [[ $RAW = 1 ]]; then
-	    printf "$LOG\n"
-	else
-	    NOTBEFORE=$(printf "${LOG}" | grep notBefore= | cut -d= -f 2)
-	    NOTAFTER=$(printf "${LOG}" | grep notAfter= | cut -d= -f 2)
-	    ISSUER=$(printf %s "${LOG}" | grep issuer= | cut -d= -f 2-99)
-	    SUBJECT=$(printf "${LOG}" | grep subject= | cut -d= -f 2-99)
-	    SERIAL=$(printf "${LOG}" | grep serial= | cut -d= -f 2)
-	    if [[ $EXPIRE = 1 ]]; then
-		DATE=$NOTAFTER; bsd-date
-		MESSAGE=" le-cert-info: $DOMAIN NOTAFTER=$NOTAFTER EXPDAYS=$EXPDAYS"; log-dbg
-		[[ $EXPDAYS -lt $DAYS ]] && printf "%d" "$EXPDAYS"
-		[[ $EXPDAYS -lt $DAYS ]] && (($VERBOSE)) && printf " days to the expiration of $DOMAIN\n"
-	    else
-		printf "[$NOTBEFORE] [$NOTAFTER] [$ISSUER] [$SUBJECT]\n"
-	    fi
-	fi
+	NOTBEFORE=$(printf "${LOG}" | grep notBefore= | cut -d= -f 2)
+	NOTAFTER=$(printf "${LOG}" | grep notAfter= | cut -d= -f 2)
+	ISSUER=$(printf %s "${LOG}" | grep issuer= | cut -d= -f 2-99)
+	SUBJECT=$(printf "${LOG}" | grep subject= | cut -d= -f 2-99)
+	SERIAL=$(printf "${LOG}" | grep serial= | cut -d= -f 2)
+	DATE=$NOTAFTER; bsd-date
     else
-	MESSAGE=" le-cert-info: line: $LINENO; $LOG"; log-err
+	MESSAGE=" le-cert-data: line: $LINENO; $LOG"; log-err
+    fi
+}
+
+function le-cert-info {
+    le-cert-data
+    if [[ $RAW -eq 1 ]]; then
+	printf "$LOG\n"
+    else
+	if [[ $EXPIRE -eq 1 ]]; then
+	    MESSAGE=" le-cert-info: $DOMAIN NOTAFTER=$NOTAFTER EXPDAYS=$EXPDAYS"; log-dbg
+	    [[ $EXPDAYS -lt $DAYS ]] && printf "%d" "$EXPDAYS"
+	    [[ $EXPDAYS -lt $DAYS ]] && (($VERBOSE)) && printf " days to the expiration of $DOMAIN\n"
+	else
+	    printf "[$NOTBEFORE] [$NOTAFTER] [$ISSUER] [$SUBJECT]\n"
+	fi
     fi
 }
 
@@ -217,7 +221,7 @@ function le-cert-renew {
     else
 	for DOMAIN in $DOMAINS; do
 	    EXPIRE="1"
-	    le-cert-info
+	    le-cert-data
 	    MESSAGE=" le-cert-renew: le-cert-info: $DOMAIN:\n$LOG"; log-dbg
 	    if [[ $EXPDAYS -lt $DAYS ]]; then
 		MESSAGE=" Due for renewal. $DOMAIN expires in $EXPDAYS days."; log-ok
@@ -245,7 +249,7 @@ function le-webserver-status {
         none|NONE)
         ;;
         apache|APACHE)
-	    if [ -e $APACHECTL ]; then
+	    if [[ -e $APACHECTL ]]; then
 		if LOG=$($APACHESTATUS 2>&1); then
 		    MESSAGE=" $WEBSERVER status: $LOG"; log-ok
 		    if LOG=$(echo $LOG | grep "is running"); then
@@ -273,7 +277,7 @@ function le-webserver-stop {
 	    MESSAGE=" Webserver: $WEBSERVER"; log-ok
             ;;
         apache|APACHE)
-	    if [ -e $APACHECTL ]; then
+	    if [[ -e $APACHECTL ]]; then
 		if [[ $RESTART -eq 1 ]]; then
 		    if  LOG=$($APACHESTOP 2>&1); then
 			MESSAGE=" $WEBSERVER stopped"; log-ok
@@ -298,7 +302,7 @@ function le-webserver-restart {
         none|NONE)
         ;;
         apache|APACHE)
-    	    if [ -e $APACHECTL ]; then
+    	    if [[ -e $APACHECTL ]]; then
 		if [[ $RESTART -eq 1 ]]; then
 
 		    if  LOG=$($APACHERESTART 2>&1); then
@@ -340,12 +344,12 @@ function le-cert-permissions {
 }
 
 
-MODE="1" # 1-info 2-renew
-ALLDOMAINS="0"
-VERBOSE="1"
-DEBUG="0"
-EXPIRE="0"
-RAW="0"
+MODE=1           # 1-info   2-renew
+ALLDOMAINS=0     # 1-single
+VERBOSE=1        # 0-silent
+DEBUG=0
+EXPIRE=0
+RAW=0
 DRYRUN=""
 DAYS=999999
 DOMAINS=$(cd $LEROOT/live; ls -1)
@@ -364,22 +368,22 @@ for i in "$@"; do
             exit
             ;;
 	-e|--expire)
-	    EXPIRE="1"
+	    EXPIRE=1
 	    ;;
 	-D=*|--Days=*)
 	    DAYS=${i#*=}
 	    ;;
         -r|--raw)
-            RAW="1"
+            RAW=1
             ;;
         -s|--silent)
-            VERBOSE="0"
+            VERBOSE=0
             ;;
         -d|--debug)
-            DEBUG="1"
+            DEBUG=1
             ;;
         -c|--renew)
-	    MODE="2"
+	    MODE=2
             ;;
         -n|--dryrun)
             DRYRUN=" --dry-run"
@@ -388,13 +392,13 @@ for i in "$@"; do
 	    le-cert-permissions
             ;;
         -a|--all)
-	    ALLDOMAINS="1"
+	    ALLDOMAINS=1
 	    le-main
             ;;
         *)
             if [[ $DOMAINS =~ $i ]]; then
                 DOMAIN=$i
-		ALLDOMAINS="0"
+		ALLDOMAINS=0
                 le-main
             else
                 MESSAGE=" Unknown domain $i"; log-err
@@ -404,3 +408,5 @@ for i in "$@"; do
 done
 
 exit 0
+
+# EOF

@@ -1,8 +1,8 @@
 #!/usr/local/bin/bash
 #set -x
 
-#VERSION="0.3.4-CURRENT"
-VERSION="0.3.4"
+VERSION="0.3.4-CURRENT"
+#VERSION="0.3.4"
 #
 LETSENCRYPT="/usr/local/bin/certbot"
 LEROOT="/usr/local/etc/letsencrypt"
@@ -53,7 +53,7 @@ List all certificates that will expire in less then 30 days
 
 
 EXPECTED_ARGS=1
-if [ $# -lt $EXPECTED_ARGS ]; then
+if [[ $# -lt $EXPECTED_ARGS ]]; then
     echo "$USAGE"
     exit
 fi
@@ -63,7 +63,7 @@ function log-ok {
     (($LOGTOFILE)) && printf "`date "+%F %T"` [OK]  leinfo: $MESSAGE\n" >> $LOGFILE
 }
 function log-dbg {
-    if [ $DEBUG -eq 1 ]; then
+    if [[ $DEBUG -eq 1 ]]; then
 	printf "[DBG] leinfo: $MESSAGE\n"
 	(($LOGTOFILE)) && printf "`date "+%F %T"` [DBG] leinfo: $MESSAGE\n" >> $LOGFILE
     fi
@@ -106,9 +106,22 @@ function le-cert-info-all {
     done
 }
 
+function le-cert-data {
+    if  LOG=$(LC_ALL=C $OPENSSL $X509ITEMS $LEROOT/live/$DOMAIN/fullchain.pem 2>&1); then
+	NOTBEFORE=$(printf "${LOG}" | grep notBefore= | cut -d= -f 2)
+	NOTAFTER=$(printf "${LOG}" | grep notAfter= | cut -d= -f 2)
+	ISSUER=$(printf %s "${LOG}" | grep issuer= | cut -d= -f 2-99)
+	SUBJECT=$(printf "${LOG}" | grep subject= | cut -d= -f 2-99)
+	SERIAL=$(printf "${LOG}" | grep serial= | cut -d= -f 2)
+	DATE=$NOTAFTER; bsd-date
+    else
+	MESSAGE=" le-cert-data: line: $LINENO; $LOG"; log-err
+    fi
+}
+
 function le-cert-info {
     (($DEBUG)) && print-config
-    if [[ $FINGERPRINTTOFILE = 1 ]]; then
+    if [[ $FINGERPRINTTOFILE -eq 1 ]]; then
 	printf "$DOMAIN\n" >> $FINGERPRINTFILE
 	if LOG=$(LC_ALL=C $OPENSSL $X509FINGERPRINT $LEROOT/live/$DOMAIN/fullchain.pem -sha256 2>&1); then
 	    printf "$LOG\n"  >> $FINGERPRINTFILE
@@ -122,7 +135,7 @@ function le-cert-info {
 	else
 	    MESSAGE=" $LOG"; log-err
 	fi
-    elif [[ $FINGERPRINT = 1 ]]; then
+    elif [[ $FINGERPRINT -eq 1 ]]; then
 	printf "$DOMAIN\n"
 	if LOG=$(LC_ALL=C $OPENSSL $X509FINGERPRINT $LEROOT/live/$DOMAIN/fullchain.pem -sha256 2>&1); then
 	    printf "$LOG\n"
@@ -135,36 +148,28 @@ function le-cert-info {
 	    MESSAGE=" $LOG"; log-err
 	fi
     else
-	if LOG=$(LC_ALL=C $OPENSSL $X509ITEMS $LEROOT/live/$DOMAIN/fullchain.pem 2>&1); then
-	    if [[ $RAW = 1 ]]; then
-		printf "$LOG\n"
-	    else
-		NOTBEFORE=$(printf "${LOG}" | grep notBefore= | cut -d= -f 2)
-		NOTAFTER=$(printf "${LOG}" | grep notAfter= | cut -d= -f 2)
-		ISSUER=$(printf %s "${LOG}" | grep issuer= | cut -d= -f 2-99)
-		SUBJECT=$(printf "${LOG}" | grep subject= | cut -d= -f 2-99)
-		SERIAL=$(printf "${LOG}" | grep serial= | cut -d= -f 2)
-		if [[ $EXPIRE = 1 ]]; then
-		    DATE=$NOTAFTER; bsd-date
-		    [ $EXPDAYS -lt $DAYS ] && printf "%d" "$EXPDAYS"
-		    [ $EXPDAYS -lt $DAYS ] && (($VERBOSE)) && printf " days to the expiration of $DOMAIN\n"
-		else
-		    printf "[$NOTBEFORE] [$NOTAFTER] [$ISSUER] [$SUBJECT]\n"
-		fi
-	    fi
+	le-cert-data
+	if [[ $RAW -eq 1 ]]; then
+	    printf "$LOG\n"
 	else
-	    MESSAGE=" $LOG"; log-err
+	    if [[ $EXPIRE -eq 1 ]]; then
+		DATE=$NOTAFTER; bsd-date
+		[[ $EXPDAYS -lt $DAYS ]] && printf "%d" "$EXPDAYS"
+		[[ $EXPDAYS -lt $DAYS ]] && (($VERBOSE)) && printf " days to the expiration of $DOMAIN\n"
+	    else
+		printf "[$NOTBEFORE] [$NOTAFTER] [$ISSUER] [$SUBJECT]\n"
+	    fi
 	fi
     fi
 }
 
 
-VERBOSE="1"
-DEBUG="0"
-EXPIRE="0"
-RAW="0"
-FINGERPRINT="0"
-FINGERPRINTTOFILE="0"
+VERBOSE=1
+DEBUG=0
+EXPIRE=0
+RAW=0
+FINGERPRINT=0
+FINGERPRINTTOFILE=0
 DAYS=999999
 DOMAINS=$(cd $LEROOT/live; ls -1)
 
@@ -183,26 +188,26 @@ for i in "$@"; do
             exit
             ;;
 	-e|--expire)
-	    EXPIRE="1"
+	    EXPIRE=1
 	    ;;
 	-D=*|--Days=*)
 	    DAYS=${i#*=}
 	    ;;
         -r|--raw)
-            RAW="1"
+            RAW=1
             ;;
         -f|--fingerprint)
-            FINGERPRINT="1"
+            FINGERPRINT=1
             ;;
 	-g|--fingerprint-file)
-            FINGERPRINTTOFILE="1"
+            FINGERPRINTTOFILE=1
 	    printf "$(date)\n" > $FINGERPRINTFILE
             ;;
         -s|--silent)
-            VERBOSE="0"
+            VERBOSE=0
             ;;
         -d|--debug)
-            DEBUG="1"
+            DEBUG=1
             ;;
         -a|--all)
 	    le-cert-info-all
@@ -219,3 +224,5 @@ for i in "$@"; do
 done
 
 exit 0
+
+# EOF
