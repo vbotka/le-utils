@@ -220,7 +220,6 @@ function le-cert-renew {
 	exit 101
     else
 	for DOMAIN in $DOMAINS; do
-	    EXPIRE="1"
 	    le-cert-data
 	    MESSAGE=" le-cert-renew: le-cert-info: $DOMAIN:\n$LOG"; log-dbg
 	    if [[ $EXPDAYS -lt $DAYS ]]; then
