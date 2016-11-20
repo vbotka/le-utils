@@ -4,7 +4,6 @@
 VERSION="0.3.4-CURRENT"
 #VERSION="0.3.4"
 
-#
 LETSENCRYPT="/usr/local/bin/certbot"
 LEROOT="/usr/local/etc/letsencrypt"
 LEOWNER="root"
