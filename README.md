@@ -45,4 +45,23 @@ Congratulations, all renewals succeeded. The following certs have been renewed:
 --
 ```
 
+Steps after renewal
+-------------------
 
+Set permissions of private keys
+
+```
+$ lectl -p
+```
+
+Rebuild the FINGERPRINT file
+
+```
+$ leinfo -g -a
+```
+
+Rebuild the IDS data (https://github.com/vbotka/integrity)
+
+```
+$ integrity -r letsencrypt usr-local-etc
+```
