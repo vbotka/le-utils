@@ -4,7 +4,7 @@ le-utils
 
 Utilities to manage letsencrypt.org certificates.
 
-Installation and configuration tested with https://galaxy.ansible.com/vbotka/ansible-leutils/
+Installation and configuration tested with https://galaxy.ansible.com/vbotka/leutils/
 
 Example of a renewal
 --------------------
@@ -65,3 +65,26 @@ Rebuild the IDS data (https://github.com/vbotka/integrity)
 ```
 $ integrity -r letsencrypt usr-local-etc
 ```
+
+Notes
+-----
+
+1) Renewal of single ceritificate                                                                                                                                                             
+```
+# /usr/local/bin/letsencrypt(certbot) renew --dry-run -d example.com
+```
+
+Currently, the renew verb is only capable of renewing all installed certificates that are due to be renewed; individual domains cannot be specified with this action. If you would like to renew specific certificates, use the certonly command. The renew verb may provide other options for selecting certificates to renew in the future.
+
+2) Rate Limits for Let’s Encrypt                                                                                                                                                              
+https://community.letsencrypt.org/t/rate-limits-for-lets-encrypt                                                                                                                              
+* limited to 20 certificates per domain per week                                                                                                                                              
+* limited to 5 certificates per FQDN set per week                                                                                                                                             
+* the number of registrations you can make in a given time period; currently 500 per 3 hours                                                                                                   
+  
+3) Lifetime of the certificate (Pros and cons of 90-day certificate lifetimes)                                                                                                                                                                        
+https://community.letsencrypt.org/t/pros-and-cons-of-90-day-certificate-lifetimes                                                                                                             
+The Technical Advisory Board chose                                                                                                                                                            
+* 90-day certificate lifetime to start with                                                                                                                                                   
+* with an expectation that people will want to auto-renew at the 60-day mark.                                                                                                                                                                                
+4) Certbot will not renew a certificate more then 30 days before expiration. Message: Cert not yet due for renewal.
