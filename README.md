@@ -76,17 +76,15 @@ Notes
 
 Currently, the renew verb is only capable of renewing all installed certificates that are due to be renewed; individual domains cannot be specified with this action. If you would like to renew specific certificates, use the certonly command. The renew verb may provide other options for selecting certificates to renew in the future.
 
-2) Rate Limits for Let’s Encrypt                                                                                                                                                              
-https://community.letsencrypt.org/t/rate-limits-for-lets-encrypt                                                                                                                              
-* limited to 20 certificates per domain per week                                                                                                                                              
-* limited to 5 certificates per FQDN set per week                                                                                                                                             
-* the number of registrations you can make in a given time period; currently 500 per 3 hours                                                                                                   
+2) Rate Limits for Let’s Encrypt                              
+https://letsencrypt.org/docs/rate-limits/
+* 20 certificates per domain per week
+* 5 certificates per FQDN set per week
+* 100 names per certificate. A certificate with multiple names is often called a SAN certificate, or sometimes a UCC certificate.
+* The number of registrations you can make in a given time period; currently 500 per 3 hours                                                                                                   
   
-3) Lifetime of the certificate (Pros and cons of 90-day certificate lifetimes)                                                                                                                                                                        
-https://community.letsencrypt.org/t/pros-and-cons-of-90-day-certificate-lifetimes                                                                                                             
-The Technical Advisory Board chose                                                                                                                                                            
-* 90-day certificate lifetime to start with                                                                                                                                                   
-* with an expectation that people will want to auto-renew at the 60-day mark.                                                                                                                                                                                
+3) Lifetime of the certificate (Pros and cons of 90-day certificate lifetimes)                                           
+https://community.letsencrypt.org/t/pros-and-cons-of-90-day-certificate-lifetimes                                             The Technical Advisory Board chose                                                                                           * 90-day certificate lifetime to start with                                                                                   * with an expectation that people will want to auto-renew at the 60-day mark.                                                  
 4) Certbot will not renew a certificate more then 30 days before expiration. Message: Cert not yet due for renewal.
 
 5) Daily dry-run renewal is recommended. "This verifies whether you're apparently able to get a certificate, in your current configuration ... You can use this to simulate what would apparently happen if you ran the command without --dry-run." [Q. What's the new --dry-run flag?] (https://community.letsencrypt.org/t/help-us-test-renewal-with-letsencrypt-renew/10562)
