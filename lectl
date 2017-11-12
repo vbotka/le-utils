@@ -75,7 +75,7 @@ Renew all certificates if any of them expires in less then 30 days
 Set permissions of private keys to $PRIVKEYMOD
 # lectl -p
 
-Notes:
+Notes https://letsencrypt.org/docs/rate-limits/
 1) Renewal of single ceritificate
 # /usr/local/bin/letsencrypt(certbot) renew --dry-run -d example.com
 Currently, the renew verb is only capable of renewing all installed
