@@ -1,10 +1,11 @@
 #!/usr/local/bin/bash
 #set -x
 
-VERSION="0.3.4-CURRENT"
-#VERSION="0.3.4"
+#VERSION="0.3.6-CURRENT"
+VERSION="0.3.5"
 
 LETSENCRYPT="/usr/local/bin/certbot"
+LESERVER="--standalone"
 LEROOT="/usr/local/etc/letsencrypt"
 LEOWNER="root"
 LEGROUP="wheel"
@@ -102,7 +103,7 @@ expiration. Message: Cert not yet due for renewal.
 permissions of: $LEPRIVDIRS in $LEROOT to $LEPRIVDIRMOD ."
 
 # ERR  Description
-# 101  Renewal of single certificate not available.
+# 101  Renewal of certificate failed.
 # 102  Unknown webserver
 # 103  Webserver failed to restart
 # 104  Set Permissions of private keys failed
@@ -212,33 +213,36 @@ function le-cert-info {
     fi
 }
 
+function le-cert-renew-domain {
+    le-cert-data
+    MESSAGE=" le-cert-renew-domain: le-cert-data: $DOMAIN:\n$LOG"; log-dbg
+    if [[ $EXPDAYS -lt $DAYS ]]; then
+	MESSAGE=" $DOMAIN expires in $EXPDAYS days. Due for renewal."; log-ok
+        LECMD="$LETSENCRYPT certonly $LESERVER $LEQUIET $DRYRUN -d $DOMAIN"
+	if LOG=$($LECMD 2>&1); then
+	    [[ ! -z $LOG ]] && (MESSAGE=" Log: \n$LOG"; log-ok)
+	    MESSAGE=" Renewal of $DOMAIN finished. Check the permissions, or run: lectl -p"; log-ok
+	else
+	    MESSAGE=" [101] le-cert-renew-domain: line: $LINENO; $LECMD; error: $?"; log-err
+	    MESSAGE=" Log: \n$LOG"; log-err
+	fi
+    else
+	MESSAGE=" $DOMAIN expires in $EXPDAYS days. No renewal this time."; log-ok
+    fi
+}
+
 function le-cert-renew {
+# TODO: stop and restart webserver only if needed
+    le-webserver-status
+    le-webserver-stop
     if [[ $ALLDOMAINS -eq 0 ]]; then
-	# $LETSENCRYPT renew $DRYRUN -d $DOMAIN
-	MESSAGE=" le-cert-info: line: $LINENO; Renewal of single certificate not available."; log-err
-	exit 101
+	le-cert-renew-domain
     else
 	for DOMAIN in $DOMAINS; do
-	    le-cert-data
-	    MESSAGE=" le-cert-renew: le-cert-info: $DOMAIN:\n$LOG"; log-dbg
-	    if [[ $EXPDAYS -lt $DAYS ]]; then
-		MESSAGE=" Due for renewal. $DOMAIN expires in $EXPDAYS days."; log-ok
-		le-webserver-status
-		le-webserver-stop
-		if LOG=$($LETSENCRYPT renew $DRYRUN  2>&1); then
-		    [[ ! -z $LOG ]] && (MESSAGE=" $LETSENCRYPT log: \n$LOG"; log-ok)
-		    MESSAGE=" $LETSENCRYPT renew $DRYRUN finished. Check the permissions, or run: lectl -p"; log-ok
-		else
-		    MESSAGE=" le-cert-renew: line: $LINENO; $LETSENCRYPT renew $DRYRUN error: $?"; log-err
-		    MESSAGE=" $LETSENCRYPT renew $DRYRUN log: \n$LOG"; log-err
-		fi
-		le-webserver-restart
-		break
-	    else
-		MESSAGE=" No renewal. $DOMAIN expires in $EXPDAYS days."; log-ok
-	    fi
+	    le-cert-renew-domain
 	done
     fi
+    le-webserver-restart
 }
 
 function le-webserver-status {
@@ -341,10 +345,10 @@ function le-cert-permissions {
     fi
 }
 
-
 MODE=1           # 1-info   2-renew
 ALLDOMAINS=0     # 1-single
 VERBOSE=1        # 0-silent
+LEQUIET=""
 DEBUG=0
 EXPIRE=0
 RAW=0
@@ -376,6 +380,7 @@ for i in "$@"; do
             ;;
         -s|--silent)
             VERBOSE=0
+	    LEQUIET="--quiet"
             ;;
         -d|--debug)
             DEBUG=1
@@ -384,7 +389,7 @@ for i in "$@"; do
 	    MODE=2
             ;;
         -n|--dryrun)
-            DRYRUN=" --dry-run"
+            DRYRUN="--dry-run"
             ;;
         -p|--permissions)
 	    le-cert-permissions
