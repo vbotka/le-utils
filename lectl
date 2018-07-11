@@ -346,7 +346,7 @@ function le-cert-permissions {
 }
 
 MODE=1           # 1-info   2-renew
-ALLDOMAINS=0     # 1-single
+ALLDOMAINS=0     # 1-all domains, 0-single domain
 VERBOSE=1        # 0-silent
 LEQUIET=""
 DEBUG=0
