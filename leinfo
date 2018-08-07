@@ -1,8 +1,8 @@
 #!/usr/local/bin/bash
 #set -x
 
-VERSION="0.3.6-CURRENT"
-#VERSION="0.3.5"
+#VERSION="0.3.7-CURRENT"
+VERSION="0.3.6"
 
 LETSENCRYPT="/usr/local/bin/certbot"
 LEROOT="/usr/local/etc/letsencrypt"
