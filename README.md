@@ -66,15 +66,37 @@ Rebuild the IDS data (https://github.com/vbotka/integrity)
 $ integrity -r letsencrypt usr-local-etc
 ```
 
+Example of dry-run renewal
+--------------------------
+
+```
+# lectl -n -c example.com
+[OK]  lectl:  LEROOTMDATE=1533608521 stored
+[OK]  lectl:  APACHE status: apache24 is running as pid 92877.
+[OK]  lectl:  APACHE stopped
+[OK]  lectl:  example.com expires in 61 days. Due for renewal.
+[OK]  lectl:  Log: 
+Saving debug log to /var/log/letsencrypt/letsencrypt.log
+Plugins selected: Authenticator standalone, Installer None
+Cert not due for renewal, but simulating renewal for dry run
+Renewing an existing certificate
+Performing the following challenges:
+tls-sni-01 challenge for example.com
+Waiting for verification...
+Cleaning up challenges
+IMPORTANT NOTES:
+ - The dry run was successful.
+[OK]  lectl:  Renewal of example.com finished. Check the permissions, or run: lectl -p
+[OK]  lectl:  LEROOTMDATE=1533608521 restored
+[OK]  lectl:  APACHE restarted
+```
+
 Notes
 -----
 
-1) Renewal of single ceritificate                                                                                                                                                             
-```
-# /usr/local/bin/letsencrypt(certbot) renew --dry-run -d example.com
-```
-
-Currently, the renew verb is only capable of renewing all installed certificates that are due to be renewed; individual domains cannot be specified with this action. If you would like to renew specific certificates, use the certonly command. The renew verb may provide other options for selecting certificates to renew in the future.
+1) certbot certonly vs. renew
+* *certbot certonly* can "Obtain or renew a certificate, but do not install it"
+* *certbot renew* can "Renew all previously obtained certificates that are near expiry"
 
 2) Rate Limits for Let’s Encrypt                              
 https://letsencrypt.org/docs/rate-limits/
