@@ -69,6 +69,7 @@
       command: "touch {{ source_lock }}"
       args:
         creates: "{{ source_lock }}"
+        warn: false
       when: source_lock_set
     
     - name: "Copy scripts to {{ bin_dir }}"

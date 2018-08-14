@@ -1,8 +1,8 @@
 #!/usr/local/bin/bash
 #set -x
 
-#VERSION="0.3.7-CURRENT"
-VERSION="0.3.6"
+VERSION="0.3.7-CURRENT"
+# VERSION="0.3.6"
 
 LETSENCRYPT="/usr/local/bin/certbot"
 LESERVER="--standalone"
@@ -13,6 +13,8 @@ LEGROUP="wheel"
 LEPRIVDIRS="accounts keys live"
 LEPRIVDIRMOD="0700"
 LEPRIVKEYMOD="0600"
+LEHOOKSPRE="/usr/local/etc/letsencrypt/renewal-hooks/pre"
+LEHOOKSPOST="/usr/local/etc/letsencrypt/renewal-hooks/post"
 #
 OPENSSL="/usr/bin/openssl"
 X509ITEMS="x509 -dates -email -issuer -subject -serial -noout -in"
@@ -109,6 +111,7 @@ permissions of: $LEPRIVDIRS in $LEROOT to $LEPRIVDIRMOD ."
 # 103  Webserver failed to restart
 # 104  Set Permissions of private keys failed
 # 105  Set Permissions of private directory failed
+# 106  Domain renewal post-hook failed
 
 EXPECTED_ARGS=1
 if [[ $# -lt $EXPECTED_ARGS ]]; then
@@ -215,6 +218,21 @@ function le-cert-info {
     fi
 }
 
+function le-cert-renew-domain-hook-post {
+    if [[ -z $DRYRUN ]]; then
+	if [[ -e $LEHOOKSPOST/$DOMAIN ]]; then
+	    MESSAGE=" Running $LEHOOKSPOST/$DOMAIN"; log-ok
+	    if LOG=$($LEHOOKSPOST/$DOMAIN 2>&1); then
+		[[ ! -z $LOG ]] && (MESSAGE=" Log: \n$LOG"; log-ok)
+		MESSAGE=" $LEHOOKSPOST/$DOMAIN finished"; log-ok
+	    else
+		MESSAGE=" [106] le-cert-renew-domain-hook-post: line: $LINENO; $LECMD; error: $?"; log-err
+		MESSAGE=" Log: \n$LOG"; log-err
+	    fi
+	fi
+    fi
+}
+
 function le-cert-renew-domain {
     le-cert-data
     MESSAGE=" le-cert-renew-domain: le-cert-data: $DOMAIN:\n$LOG"; log-dbg
@@ -224,6 +242,7 @@ function le-cert-renew-domain {
 	if LOG=$($LECMD 2>&1); then
 	    [[ ! -z $LOG ]] && (MESSAGE=" Log: \n$LOG"; log-ok)
 	    MESSAGE=" Renewal of $DOMAIN finished. Check the permissions, or run: lectl -p"; log-ok
+	    le-cert-renew-domain-hook-post
 	else
 	    MESSAGE=" [101] le-cert-renew-domain: line: $LINENO; $LECMD; error: $?"; log-err
 	    MESSAGE=" Log: \n$LOG"; log-err
