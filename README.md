@@ -111,3 +111,8 @@ https://community.letsencrypt.org/t/pros-and-cons-of-90-day-certificate-lifetime
 
 5) Daily dry-run renewal is recommended. "This verifies whether you're apparently able to get a certificate, in your current configuration ... You can use this to simulate what would apparently happen if you ran the command without --dry-run." [Q. What's the new --dry-run flag?] (https://community.letsencrypt.org/t/help-us-test-renewal-with-letsencrypt-renew/10562)
 
+
+References
+----------
+
+* [Certbot documentation](https://certbot.eff.org/docs/)
