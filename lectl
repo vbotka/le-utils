@@ -59,10 +59,10 @@ where:
  -D --Days=NoOfDays . with -e list certificates that will expire in period of NoOfDays
  -s --silent ........ print errors only; with -e only report number of days to expire
  -d --debug ......... print debug output
- -c --renew ......... renew cerficates (Note 2,3)
+ -c --renew ......... renew cerficates (Note 2,3,6)
  -n --dryrun ........ with -c dry run only
- -a --all ........... check all domains
- <CN> ............... check domain (Note 1)
+ -a --all ........... all domains
+ <CN> ............... domain (Note 1)
 
 Examples:
 Print information about all certificates.
@@ -103,7 +103,9 @@ The Technical Advisory Board chose
 4) Certobot will not renew a certificate more then 30 days before
 expiration. Message: Cert not yet due for renewal.
 5) Set permissions of all private keys to $LEPRIVKEYMOD and set
-permissions of: $LEPRIVDIRS in $LEROOT to $LEPRIVDIRMOD ."
+permissions of: $LEPRIVDIRS in $LEROOT to $LEPRIVDIRMOD .
+6) File with the name of the coresponding domain will be run from the
+directory LEHOOKSPOST after the renewal of the domain."
 
 # ERR  Description
 # 101  Renewal of certificate failed.
@@ -138,6 +140,8 @@ function print-config {
     printf "[DBG] lectl: >>> CONFIG\n"
     printf "[DBG] lectl: LETSENCRYPT: $LETSENCRYPT\n"
     printf "[DBG] lectl: LEROOT: $LEROOT\n"
+    printf "[DBG] lectl: LEHOOKSPRE: $LEHOOKSPRE\n"
+    printf "[DBG] lectl: LEHOOKSPOST: $LEHOOKSPOST\n"
     printf "[DBG] lectl: LEROOTMTIMEPRESERVE: $LEROOTMTIMEPRESERVE\n"
     printf "[DBG] lectl: OPENSSL: $OPENSSL\n"
     printf "[DBG] lectl: X509OPTS: $X509OPTS\n"
