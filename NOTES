@@ -1,0 +1,23 @@
+
+
+Note 1
+======
+set LEROOTMTIMEPRESERVE="1" to preserve mtime of LEROOT when running
+--dry-run renewal.
+See details in the feature request.
+https://github.com/certbot/certbot/issues/6281
+--dry-run should not change mtime of letsencrypt directory
+Contributor's comment:
+"This is probably because lock configuration directory (by creating and
+removing a file) when Certbot is run."
+"Unfortunately, Certbot doesn't exactly follow the Linux FHS. While I
+don't think there is a single directory that is standard for lockfiles
+across all UNIX systems (see FreeBSD for instance), you could argue
+that putting the lockfile somewhere in /var is standard. We had
+problems with this which are explained at the bottom of #4449
+(comment).
+While I'm sorry for the trouble and would be open to changing this in
+the future, I don't think we want to break backwards compatibility by
+moving the lockfile to another location right now."
+
+--
