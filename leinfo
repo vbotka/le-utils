@@ -119,34 +119,42 @@ function le-cert-data {
     fi
 }
 
+function le-cert-fingerprint-to-file {
+    printf "$DOMAIN\n" >> $FINGERPRINTFILETMP
+    if LOG=$(LC_ALL=C $OPENSSL $X509FINGERPRINT $LEROOT/live/$DOMAIN/fullchain.pem -sha256 2>&1); then
+	printf "$LOG\n"  >> $FINGERPRINTFILETMP
+	MESSAGE=" SHA256 fingerprint of $DOMAIN recorded in $FINGERPRINTFILETMP"; log-ok
+    else
+	MESSAGE=" $LOG"; log-err
+    fi
+    if LOG=$(LC_ALL=C $OPENSSL $X509FINGERPRINT $LEROOT/live/$DOMAIN/fullchain.pem -sha1 2>&1); then
+	printf "$LOG\n"  >> $FINGERPRINTFILETMP
+	MESSAGE=" SHA1 fingerprint of $DOMAIN recorded in $FINGERPRINTFILETMP"; log-ok
+    else
+	MESSAGE=" $LOG"; log-err
+    fi
+}
+
+function le-cert-fingerprint {
+    printf "$DOMAIN\n"
+    if LOG=$(LC_ALL=C $OPENSSL $X509FINGERPRINT $LEROOT/live/$DOMAIN/fullchain.pem -sha256 2>&1); then
+	printf "$LOG\n"
+    else
+	MESSAGE=" $LOG"; log-err
+    fi
+    if LOG=$(LC_ALL=C $OPENSSL $X509FINGERPRINT $LEROOT/live/$DOMAIN/fullchain.pem -sha1 2>&1); then
+	printf "$LOG\n"
+    else
+	MESSAGE=" $LOG"; log-err
+    fi
+}
+
 function le-cert-info {
     (($DEBUG)) && print-config
     if [[ $FINGERPRINTTOFILE -eq 1 ]]; then
-	printf "$DOMAIN\n" >> $FINGERPRINTFILE
-	if LOG=$(LC_ALL=C $OPENSSL $X509FINGERPRINT $LEROOT/live/$DOMAIN/fullchain.pem -sha256 2>&1); then
-	    printf "$LOG\n"  >> $FINGERPRINTFILE
-	    MESSAGE=" SHA256 fingerprint of $DOMAIN recorded in $FINGERPRINTFILE"; log-ok
-	else
-	    MESSAGE=" $LOG"; log-err
-	fi
-	if LOG=$(LC_ALL=C $OPENSSL $X509FINGERPRINT $LEROOT/live/$DOMAIN/fullchain.pem -sha1 2>&1); then
-	    printf "$LOG\n"  >> $FINGERPRINTFILE
-	    MESSAGE=" SHA1 fingerprint of $DOMAIN recorded in $FINGERPRINTFILE"; log-ok
-	else
-	    MESSAGE=" $LOG"; log-err
-	fi
+	le-cert-fingerprint-to-file
     elif [[ $FINGERPRINT -eq 1 ]]; then
-	printf "$DOMAIN\n"
-	if LOG=$(LC_ALL=C $OPENSSL $X509FINGERPRINT $LEROOT/live/$DOMAIN/fullchain.pem -sha256 2>&1); then
-	    printf "$LOG\n"
-	else
-	    MESSAGE=" $LOG"; log-err
-	fi
-	if LOG=$(LC_ALL=C $OPENSSL $X509FINGERPRINT $LEROOT/live/$DOMAIN/fullchain.pem -sha1 2>&1); then
-	    printf "$LOG\n"
-	else
-	    MESSAGE=" $LOG"; log-err
-	fi
+	le-cert-fingerprint
     else
 	le-cert-data
 	if [[ $RAW -eq 1 ]]; then
@@ -163,6 +171,16 @@ function le-cert-info {
     fi
 }
 
+function le-cert-post {
+    if [[ $FINGERPRINTTOFILE -eq 1 ]]; then
+	if LOG=$(cmp -s $FINGERPRINTFILE $FINGERPRINTFILETMP || cp $FINGERPRINTFILETMP $FINGERPRINTFILE); then
+	    MESSAGE=" $FINGERPRINTFILE is current."; log-ok
+	else
+	    MESSAGE=" $LOG"; log-err
+	fi
+	rm "$FINGERPRINTFILETMP"
+    fi
+}
 
 VERBOSE=1
 DEBUG=0
@@ -201,7 +219,14 @@ for i in "$@"; do
             ;;
 	-g|--fingerprint-file)
             FINGERPRINTTOFILE=1
-	    printf "$(date)\n" > $FINGERPRINTFILE
+	    if [ ! -f $FINGERPRINTFILE ]; then
+		touch $FINGERPRINTFILE
+	    fi
+	    if FINGERPRINTFILETMP=`mktemp /tmp/leinfo.XXXXXX`; then
+		MESSAGE=" $FINGERPRINTFILETMP created"; log-ok
+	    else
+		MESSAGE=" Failed to create temp file."; log-err
+	    fi
             ;;
         -s|--silent)
             VERBOSE=0
@@ -222,6 +247,7 @@ for i in "$@"; do
             ;;
     esac
 done
+le-cert-post
 
 exit 0
 
